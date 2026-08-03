@@ -81,6 +81,11 @@ public:
     // pumpEvents(). Edge/repeat-triggered, for editing controls.
     bool keyPressed(Key key) const;
 
+    // Left mouse button press this frame (edge), and its click count
+    // (1 = single, 2 = double, ...). mouseClicks() is 0 when no press occurred.
+    bool mousePressed() const;
+    int  mouseClicks() const;
+
     // Low-level handles for in-house rendering code.
     SDL_Window*   handle() const;
     SDL_Renderer* renderer() const;

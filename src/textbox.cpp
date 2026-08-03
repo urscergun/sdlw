@@ -5,6 +5,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <cctype>
 #include <utility>
 
 namespace sdlw {
@@ -23,6 +24,44 @@ std::size_t nextCharStart(const std::string& s, std::size_t i) {
     ++i;
     while (i < n && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) ++i;
     return i;
+}
+
+// Character classes for word navigation: 0 = whitespace, 1 = word
+// (alphanumeric, underscore, or any non-ASCII byte), 2 = punctuation.
+int charClass(unsigned char c) {
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return 0;
+    if (c >= 0x80 || c == '_' || std::isalnum(c)) return 1;
+    return 2;
+}
+// Ctrl+Left: skip whitespace to the left, then the run of same-class chars.
+std::size_t wordLeft(const std::string& s, std::size_t i) {
+    while (i > 0 && charClass(static_cast<unsigned char>(s[i - 1])) == 0) --i;
+    if (i > 0) {
+        int cls = charClass(static_cast<unsigned char>(s[i - 1]));
+        while (i > 0 && charClass(static_cast<unsigned char>(s[i - 1])) == cls) --i;
+    }
+    return i;
+}
+// Ctrl+Right: skip the current run, then following whitespace (to next word start).
+std::size_t wordRight(const std::string& s, std::size_t i) {
+    std::size_t n = s.size();
+    if (i < n) {
+        int cls = charClass(static_cast<unsigned char>(s[i]));
+        while (i < n && charClass(static_cast<unsigned char>(s[i])) == cls) ++i;
+    }
+    while (i < n && charClass(static_cast<unsigned char>(s[i])) == 0) ++i;
+    return i;
+}
+// Bounds of the run of same-class characters around byte index i (for double-click).
+std::pair<std::size_t, std::size_t> wordBounds(const std::string& s, std::size_t i) {
+    std::size_t n = s.size();
+    if (n == 0) return { 0, 0 };
+    std::size_t p = (i >= n) ? n - 1 : i;
+    int cls = charClass(static_cast<unsigned char>(s[p]));
+    std::size_t lo = p, hi = p + 1;
+    while (lo > 0 && charClass(static_cast<unsigned char>(s[lo - 1])) == cls) --lo;
+    while (hi < n && charClass(static_cast<unsigned char>(s[hi])) == cls) ++hi;
+    return { lo, hi };
 }
 // Pixel width of s[0..idx) at the current font.
 int widthTo(Font& font, const std::string& s, std::size_t idx) {
@@ -68,28 +107,35 @@ void TextBox::setFocused(bool focused, Window& win) {
 
 void TextBox::update(Window& win, Font& font) {
     const float pad = 6.0f;
-    bool shift = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
+    SDL_Keymod mod = SDL_GetModState();
+    bool shift = (mod & SDL_KMOD_SHIFT) != 0;
+    bool ctrl  = (mod & SDL_KMOD_CTRL) != 0;
 
-    // --- Mouse: focus, click-to-place caret, drag-to-select ----------------
+    // --- Mouse: focus, click-to-place caret, double-click word, drag-select -
     float mx = 0, my = 0;
     bool down = (SDL_GetMouseState(&mx, &my) & SDL_BUTTON_LMASK) != 0;
     bool inside = (mx >= x_ && mx < x_ + w_ && my >= y_ && my < y_ + h_);
     float localX = mx - (x_ + pad) + scroll_;
 
-    if (down && !wasDown_) {                 // press edge
+    if (win.mousePressed()) {                 // press edge (from event)
         setFocused(inside, win);
         if (inside) {
             std::size_t hit = indexFromX(font, text_, localX);
-            caret_ = hit;
-            if (!shift) sel_ = hit;          // shift-click extends existing selection
-            dragging_ = true;
+            if (win.mouseClicks() >= 2) {     // double-click selects the word
+                auto [lo, hi] = wordBounds(text_, hit);
+                sel_ = lo;
+                caret_ = hi;
+                dragging_ = false;
+            } else {
+                caret_ = hit;
+                if (!shift) sel_ = hit;       // shift-click extends existing selection
+                dragging_ = true;
+            }
         }
     } else if (down && dragging_ && focused_) { // dragging extends the caret end
         caret_ = indexFromX(font, text_, localX);
-    } else if (!down) {
-        dragging_ = false;
     }
-    wasDown_ = down;
+    if (!down) dragging_ = false;
 
     if (!focused_) return;
 
@@ -152,12 +198,14 @@ void TextBox::update(Window& win, Font& font) {
         }
     }
     if (win.keyPressed(Key::Left)) {
-        if (hasSelection() && !shift) caret_ = std::min(sel_, caret_);
+        if (ctrl)                     caret_ = wordLeft(text_, caret_);       // Ctrl(+Shift)+Left
+        else if (hasSelection() && !shift) caret_ = std::min(sel_, caret_);
         else                          caret_ = prevCharStart(text_, caret_);
         if (!shift) sel_ = caret_;
     }
     if (win.keyPressed(Key::Right)) {
-        if (hasSelection() && !shift) caret_ = std::max(sel_, caret_);
+        if (ctrl)                     caret_ = wordRight(text_, caret_);      // Ctrl(+Shift)+Right
+        else if (hasSelection() && !shift) caret_ = std::max(sel_, caret_);
         else                          caret_ = nextCharStart(text_, caret_);
         if (!shift) sel_ = caret_;
     }

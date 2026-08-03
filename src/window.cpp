@@ -40,6 +40,8 @@ struct Window::Impl {
     // Per-frame input, refreshed by pumpEvents().
     std::string   frameText;                        // UTF-8 typed this frame
     bool          keys[int(Key::Count)] = {};       // indexed by Key enum
+    bool          mousePressed = false;             // left button down this frame
+    int           mouseClicks = 0;                  // click count of that press
 };
 
 namespace {
@@ -114,6 +116,8 @@ bool Window::pumpEvents() {
     // Reset per-frame input.
     impl_->frameText.clear();
     for (bool& k : impl_->keys) k = false;
+    impl_->mousePressed = false;
+    impl_->mouseClicks = 0;
 
     bool running = true;
     SDL_Event ev;
@@ -131,6 +135,12 @@ bool Window::pumpEvents() {
             }
             case SDL_EVENT_TEXT_INPUT:
                 if (ev.text.text) impl_->frameText += ev.text.text;
+                break;
+            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                if (ev.button.button == SDL_BUTTON_LEFT) {
+                    impl_->mousePressed = true;
+                    impl_->mouseClicks = ev.button.clicks;
+                }
                 break;
             default:
                 break;
@@ -153,6 +163,9 @@ bool Window::keyPressed(Key key) const {
     int idx = int(key);
     return (idx >= 0 && idx < int(Key::Count)) ? impl_->keys[idx] : false;
 }
+
+bool Window::mousePressed() const { return impl_->mousePressed; }
+int  Window::mouseClicks() const { return impl_->mouseClicks; }
 
 void Window::clear(unsigned char r, unsigned char g, unsigned char b) {
     if (!impl_->renderer) return;

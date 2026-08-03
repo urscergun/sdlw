@@ -59,7 +59,6 @@ private:
     std::size_t sel_ = 0;     // selection anchor, in bytes; sel_==caret_ => none
     float  scroll_ = 0;       // horizontal scroll offset in pixels
     bool   focused_ = false;
-    bool   wasDown_ = false;  // mouse-left state last frame
     bool   dragging_ = false; // selecting with the mouse
 };
 
