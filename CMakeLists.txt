@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(sdlw LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+# C++20 for designated initializers ({.title = ...}) used by the window API.
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # libSDL is the only external dependency. By default we build the vendored
