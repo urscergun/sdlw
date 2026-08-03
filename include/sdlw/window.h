@@ -16,8 +16,13 @@ struct SDL_Renderer;
 
 namespace sdlw {
 
-// Editing keys reported per-frame by Window (see keyPressed()).
-enum class Key { Backspace, Delete, Left, Right, Home, End, Enter, Tab };
+// Editing keys / command combos reported per-frame by Window (see keyPressed()).
+// The Select/Copy/Cut/Paste entries are the Ctrl+A/C/X/V shortcuts.
+enum class Key {
+    Backspace, Delete, Left, Right, Home, End, Enter, Tab,
+    SelectAll, Copy, Cut, Paste,
+    Count
+};
 
 struct WindowConfig {
     std::string title = "sdlw window";

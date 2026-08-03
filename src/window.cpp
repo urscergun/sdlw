@@ -38,13 +38,23 @@ struct Window::Impl {
     bool          sdlOwned = false;
 
     // Per-frame input, refreshed by pumpEvents().
-    std::string   frameText;                 // UTF-8 typed this frame
-    bool          keys[8] = {};              // indexed by Key enum
+    std::string   frameText;                        // UTF-8 typed this frame
+    bool          keys[int(Key::Count)] = {};       // indexed by Key enum
 };
 
 namespace {
-// Map an SDL keycode to a sdlw::Key index, or -1 if not an editing key.
-int keyIndex(SDL_Keycode k) {
+// Map an SDL key event to a sdlw::Key index, or -1 if not one we track.
+// Ctrl+A/C/X/V map to the Select/Copy/Cut/Paste command entries.
+int keyIndex(SDL_Keycode k, SDL_Keymod mod) {
+    if (mod & SDL_KMOD_CTRL) {
+        switch (k) {
+            case SDLK_A: return int(Key::SelectAll);
+            case SDLK_C: return int(Key::Copy);
+            case SDLK_X: return int(Key::Cut);
+            case SDLK_V: return int(Key::Paste);
+            default: break;
+        }
+    }
     switch (k) {
         case SDLK_BACKSPACE: return int(Key::Backspace);
         case SDLK_DELETE:    return int(Key::Delete);
@@ -115,7 +125,7 @@ bool Window::pumpEvents() {
                 break;
             case SDL_EVENT_KEY_DOWN: {
                 if (ev.key.key == SDLK_ESCAPE) { running = false; break; }
-                int idx = keyIndex(ev.key.key);
+                int idx = keyIndex(ev.key.key, ev.key.mod);
                 if (idx >= 0) impl_->keys[idx] = true;
                 break;
             }
@@ -141,7 +151,7 @@ const char* Window::textInput() const { return impl_->frameText.c_str(); }
 
 bool Window::keyPressed(Key key) const {
     int idx = int(key);
-    return (idx >= 0 && idx < 8) ? impl_->keys[idx] : false;
+    return (idx >= 0 && idx < int(Key::Count)) ? impl_->keys[idx] : false;
 }
 
 void Window::clear(unsigned char r, unsigned char g, unsigned char b) {

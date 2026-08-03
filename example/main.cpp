@@ -51,7 +51,7 @@ int Main(int argc, char** argv) {
     std::string greeting;
 
     while (win.pumpEvents()) {
-        name.update(win);
+        name.update(win, ui);
         if (greetBtn.update()) {
             greeting = name.text().empty() ? "" : ("Hello, " + name.text() + "!");
         }
