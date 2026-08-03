@@ -32,6 +32,7 @@ void ComboBox::setItems(std::vector<std::string> items) {
 }
 void ComboBox::setText(std::string text) {
     field_.setText(text);
+    committed_ = true;
     lastText_ = std::move(text);
     refilter();
 }
@@ -48,15 +49,27 @@ void ComboBox::layout(Font& font) {
 void ComboBox::refilter() {
     const std::string& t = field_.text();
     std::vector<std::string> filtered;
-    for (const std::string& it : items_)
-        if (containsCI(it, t)) filtered.push_back(it);
+    int sel = -1;
+    if (committed_) {
+        // A value is chosen: show the whole list so the user can browse,
+        // highlighting the current value if it's present.
+        filtered = items_;
+        for (int i = 0; i < int(items_.size()); ++i)
+            if (items_[i] == t) { sel = i; break; }
+    } else {
+        // Typing: filter to matching items.
+        for (const std::string& it : items_)
+            if (containsCI(it, t)) filtered.push_back(it);
+        sel = filtered.empty() ? -1 : 0;
+    }
     list_.setItems(std::move(filtered));
-    list_.setSelected(list_.count() > 0 ? 0 : -1);
+    list_.setSelected(sel);
     lastText_ = t;
 }
 
 void ComboBox::commit(const std::string& item, Window& win) {
     field_.setText(item);
+    committed_ = true;
     lastText_ = item;
     open_ = false;
     field_.setFocused(false, win);
@@ -76,29 +89,38 @@ bool ComboBox::update(Window& win, Font& font) {
     float listH = float(rows * list_.rowHeight(font)) + 2.0f;
     bool overList = open_ && (mx >= x_ && mx < x_ + w_ && my >= listTop && my < listTop + listH);
 
+    // Open the popup: refresh the list and scroll the current value into view.
+    auto openPopup = [&]() {
+        open_ = true;
+        refilter();
+        int s = list_.selected();
+        if (s >= 0) list_.select(s, font);
+    };
+
     // Press outside everything closes the popup; the arrow toggles it.
     if (win.mousePressed()) {
         if (overArrow) {
-            open_ = !open_;
-            if (open_) { refilter(); field_.setFocused(true, win); }
+            if (open_) open_ = false;
+            else { field_.setFocused(true, win); openPopup(); }
         } else if (overField) {
-            open_ = true;
+            if (!open_) openPopup();
         } else if (!overList) {
             open_ = false;
         }
     }
 
-    // Field editing (typing, caret, selection). Detect text changes to filter.
+    // Field editing (typing, caret, selection). Any text edit leaves "browse"
+    // mode and filters the list.
     field_.update(win, font);
     if (field_.text() != lastText_) {
+        committed_ = false;
         open_ = true;
         refilter();
     }
 
     // Open on Down when focused but closed.
     if (field_.focused() && !open_ && win.keyPressed(Key::Down)) {
-        open_ = true;
-        refilter();
+        openPopup();
     }
 
     if (open_) {

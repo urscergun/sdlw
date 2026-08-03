@@ -66,6 +66,7 @@ private:
     float arrowW_ = 0;                  // width of the arrow button (== h_)
     int   maxVisibleRows_ = 6;
     bool  open_ = false;
+    bool  committed_ = true;            // field holds a chosen value (browse all on open)
     std::string lastText_;              // field text at last refilter
 };
 
