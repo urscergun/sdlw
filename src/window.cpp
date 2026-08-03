@@ -67,6 +67,8 @@ int keyIndex(SDL_Keycode k, SDL_Keymod mod) {
         case SDLK_DOWN:      return int(Key::Down);
         case SDLK_HOME:      return int(Key::Home);
         case SDLK_END:       return int(Key::End);
+        case SDLK_PAGEUP:    return int(Key::PageUp);
+        case SDLK_PAGEDOWN:  return int(Key::PageDown);
         case SDLK_RETURN:    return int(Key::Enter);
         case SDLK_TAB:       return int(Key::Tab);
         default:             return -1;

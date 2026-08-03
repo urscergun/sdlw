@@ -79,6 +79,12 @@ bool ListBox::update(Window& win, Font& font) {
                                                   : std::min(selected_ + 1, count() - 1);
         if (win.keyPressed(Key::Home)) selected_ = 0;
         if (win.keyPressed(Key::End))  selected_ = count() - 1;
+        // Page = number of fully visible rows (at least 1).
+        int page = std::max(1, int((h_ - 2) / rh));
+        if (win.keyPressed(Key::PageUp))
+            selected_ = std::max(0, (selected_ < 0 ? 0 : selected_) - page);
+        if (win.keyPressed(Key::PageDown))
+            selected_ = std::min(count() - 1, (selected_ < 0 ? 0 : selected_) + page);
         if (selected_ != prevSelected) scrollToSelected(font);
     }
 

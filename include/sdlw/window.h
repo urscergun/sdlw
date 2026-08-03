@@ -19,7 +19,7 @@ namespace sdlw {
 // Editing keys / command combos reported per-frame by Window (see keyPressed()).
 // The Select/Copy/Cut/Paste entries are the Ctrl+A/C/X/V shortcuts.
 enum class Key {
-    Backspace, Delete, Left, Right, Up, Down, Home, End, Enter, Tab,
+    Backspace, Delete, Left, Right, Up, Down, Home, End, PageUp, PageDown, Enter, Tab,
     SelectAll, Copy, Cut, Paste,
     Count
 };
