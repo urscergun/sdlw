@@ -74,6 +74,7 @@ void ListBox::scrollToSelected(Font& font) {
 bool ListBox::update(Window& win, Font& font) {
     int rh = rowHeight(font);
     int prevSelected = selected_;
+    itemClicked_ = false;
 
     float mx = 0, my = 0;
     bool down = (SDL_GetMouseState(&mx, &my) & SDL_BUTTON_LMASK) != 0;
@@ -110,6 +111,7 @@ bool ListBox::update(Window& win, Font& font) {
             }
         } else if (inside && hover_ >= 0) {
             selected_ = hover_;
+            itemClicked_ = true;
         }
     }
 

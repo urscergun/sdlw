@@ -51,6 +51,9 @@ public:
     // frame after Window::pumpEvents().
     bool update(Window& win, Font& font);
 
+    // True on the frame an item was clicked (even if it was already selected).
+    bool itemClicked() const { return itemClicked_; }
+
     // Draw the list, selection/hover highlights, and scrollbar thumb.
     void draw(SDL_Renderer* renderer, Font& font);
 
@@ -74,6 +77,7 @@ private:
     int   rowPad_ = 6;         // extra vertical padding per row
     bool  draggingBar_ = false;// dragging the scrollbar thumb
     float grabOffset_ = 0;     // mouse-to-thumb-top offset while dragging
+    bool  itemClicked_ = false;// an item was clicked this frame
 };
 
 } // namespace sdlw

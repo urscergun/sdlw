@@ -102,8 +102,10 @@ bool ComboBox::update(Window& win, Font& font) {
     }
 
     if (open_) {
-        // Mouse interaction with the popup; a click commits.
-        if (list_.update(win, font)) {
+        // Mouse interaction with the popup; a click on any item commits it
+        // (even if it was already the selected/highlighted row).
+        list_.update(win, font);
+        if (list_.itemClicked()) {
             if (const std::string* s = list_.selectedItem()) { commit(*s, win); committed = true; }
         }
         // Keyboard: Up/Down move the highlight, Enter commits it.
