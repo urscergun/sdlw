@@ -42,6 +42,7 @@ add_library(sdlw STATIC
     src/button.cpp
     src/textbox.cpp
     src/listbox.cpp
+    src/combobox.cpp
 )
 target_include_directories(sdlw PUBLIC include)
 target_link_libraries(sdlw PUBLIC ${SDLW_SDL_TARGET})

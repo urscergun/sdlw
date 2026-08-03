@@ -28,6 +28,12 @@ const std::string* ListBox::selectedItem() const {
     return (selected_ >= 0 && selected_ < count()) ? &items_[selected_] : nullptr;
 }
 
+void ListBox::select(int index, Font& font) {
+    setSelected(index);
+    scrollToSelected(font);
+    scroll_ = std::clamp(scroll_, 0.0f, maxScroll(font));
+}
+
 int ListBox::rowHeight(Font& font) const { return font.lineHeight() + rowPad_; }
 
 float ListBox::maxScroll(Font& font) const {

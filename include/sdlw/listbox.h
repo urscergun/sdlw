@@ -40,7 +40,11 @@ public:
     int count() const { return int(items_.size()); }
     int selected() const { return selected_; }
     void setSelected(int index);
+    // Select an item and scroll it into view (for programmatic/keyboard nav).
+    void select(int index, Font& font);
     const std::string* selectedItem() const;
+
+    int rowHeight(Font& font) const;        // pixel height of one row
 
     // Handle hover, selection (mouse + Up/Down/Home/End), and scrolling (wheel
     // + keys). Returns true if the selection changed this frame. Call once per
@@ -51,7 +55,6 @@ public:
     void draw(SDL_Renderer* renderer, Font& font);
 
 private:
-    int   rowHeight(Font& font) const;      // pixel height of one row
     float maxScroll(Font& font) const;      // clamp bound for scroll_
     void  scrollToSelected(Font& font);     // keep selected row visible
 
