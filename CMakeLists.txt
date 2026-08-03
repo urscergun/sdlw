@@ -79,3 +79,18 @@ endforeach()
 # The generated .c files bake the font atlases + descriptors into the executable.
 add_executable(sdlw_example WIN32 example/main.cpp ${SDLW_EMBEDDED_ASSETS})
 target_link_libraries(sdlw_example PRIVATE sdlw)
+
+# --- Tests (in-house harness, no external deps) ----------------------------
+# Pure-logic unit tests over the shared internal headers in src/. They don't
+# link SDL, so they build fast. Run with:  ctest --test-dir build
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    option(SDLW_BUILD_TESTS "Build sdlw unit tests" ON)
+endif()
+if(SDLW_BUILD_TESTS)
+    enable_testing()
+    foreach(t test_text test_bmfont)
+        add_executable(${t} tests/${t}.cpp)
+        target_include_directories(${t} PRIVATE src tests)
+        add_test(NAME ${t} COMMAND ${t})
+    endforeach()
+endif()

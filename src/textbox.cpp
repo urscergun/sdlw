@@ -2,67 +2,22 @@
 #include "sdlw/window.h"
 #include "sdlw/font.h"
 
+#include "text_util.h" // UTF-8 + word navigation helpers (unit-tested)
+
 #include <SDL3/SDL.h>
 
 #include <algorithm>
-#include <cctype>
 #include <utility>
 
 namespace sdlw {
 
-namespace {
-// UTF-8 aware caret movement over a byte buffer.
-std::size_t prevCharStart(const std::string& s, std::size_t i) {
-    if (i == 0) return 0;
-    --i;
-    while (i > 0 && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) --i;
-    return i;
-}
-std::size_t nextCharStart(const std::string& s, std::size_t i) {
-    std::size_t n = s.size();
-    if (i >= n) return n;
-    ++i;
-    while (i < n && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) ++i;
-    return i;
-}
+using detail::prevCharStart;
+using detail::nextCharStart;
+using detail::wordLeft;
+using detail::wordRight;
+using detail::wordBounds;
 
-// Character classes for word navigation: 0 = whitespace, 1 = word
-// (alphanumeric, underscore, or any non-ASCII byte), 2 = punctuation.
-int charClass(unsigned char c) {
-    if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return 0;
-    if (c >= 0x80 || c == '_' || std::isalnum(c)) return 1;
-    return 2;
-}
-bool isSpace(const std::string& s, std::size_t i) {
-    return charClass(static_cast<unsigned char>(s[i])) == 0;
-}
-// Word jump stops at the next space/graphic boundary, moving over exactly one
-// run: from a graphic char, stop before the first space; from a space, stop
-// before the first graphic char.
-std::size_t wordLeft(const std::string& s, std::size_t i) {
-    if (i == 0) return 0;
-    bool sp = isSpace(s, i - 1);
-    while (i > 0 && isSpace(s, i - 1) == sp) --i;
-    return i;
-}
-std::size_t wordRight(const std::string& s, std::size_t i) {
-    std::size_t n = s.size();
-    if (i >= n) return n;
-    bool sp = isSpace(s, i);
-    while (i < n && isSpace(s, i) == sp) ++i;
-    return i;
-}
-// Bounds of the run of same-class characters around byte index i (for double-click).
-std::pair<std::size_t, std::size_t> wordBounds(const std::string& s, std::size_t i) {
-    std::size_t n = s.size();
-    if (n == 0) return { 0, 0 };
-    std::size_t p = (i >= n) ? n - 1 : i;
-    int cls = charClass(static_cast<unsigned char>(s[p]));
-    std::size_t lo = p, hi = p + 1;
-    while (lo > 0 && charClass(static_cast<unsigned char>(s[lo - 1])) == cls) --lo;
-    while (hi < n && charClass(static_cast<unsigned char>(s[hi])) == cls) ++hi;
-    return { lo, hi };
-}
+namespace {
 // Pixel width of s[0..idx) at the current font.
 int widthTo(Font& font, const std::string& s, std::size_t idx) {
     int w = 0, h = 0;

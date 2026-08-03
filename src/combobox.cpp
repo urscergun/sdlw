@@ -2,24 +2,16 @@
 #include "sdlw/window.h"
 #include "sdlw/font.h"
 
+#include "text_util.h" // containsCI (unit-tested)
+
 #include <SDL3/SDL.h>
 
 #include <algorithm>
-#include <cctype>
 #include <utility>
 
 namespace sdlw {
 
-namespace {
-std::string toLower(std::string s) {
-    for (char& c : s) c = char(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
-bool containsCI(const std::string& hay, const std::string& needle) {
-    if (needle.empty()) return true;
-    return toLower(hay).find(toLower(needle)) != std::string::npos;
-}
-} // namespace
+using detail::containsCI;
 
 ComboBox::ComboBox(float x, float y, float w, float h) { setRect(x, y, w, h); }
 

@@ -1,5 +1,7 @@
 #include "sdlw/font.h"
 
+#include "bmfont.h" // .fnt descriptor parsing (unit-tested)
+
 #include <SDL3/SDL.h>
 
 #include <algorithm>
@@ -10,30 +12,10 @@
 
 namespace sdlw {
 
+using detail::bmfGetInt;
+using detail::bmfGetStr;
+
 namespace {
-
-// Parse " key=<int>" out of a BMFont line. Prepending a space makes each
-// token space-delimited so "x=" cannot match inside "xoffset=", etc.
-bool getInt(const std::string& line, const char* key, int& out) {
-    std::string needle = std::string(" ") + key + "=";
-    std::string hay = std::string(" ") + line;
-    auto p = hay.find(needle);
-    if (p == std::string::npos) return false;
-    out = std::atoi(hay.c_str() + p + needle.size()); // stops at space; handles '-'
-    return true;
-}
-
-// Parse ' key="..."' (a quoted string value) out of a BMFont line.
-std::string getStr(const std::string& line, const char* key) {
-    std::string needle = std::string(" ") + key + "=\"";
-    std::string hay = std::string(" ") + line;
-    auto p = hay.find(needle);
-    if (p == std::string::npos) return {};
-    p += needle.size();
-    auto e = hay.find('"', p);
-    if (e == std::string::npos) return {};
-    return hay.substr(p, e - p);
-}
 
 std::string dirOf(const std::string& path) {
     auto p = path.find_last_of("/\\");
@@ -88,18 +70,18 @@ struct Font::Impl {
             start = (nl == std::string::npos) ? text.size() + 1 : nl + 1;
 
             if (line.rfind("common", 0) == 0) {
-                getInt(line, "lineHeight", lineHeight);
-                getInt(line, "base", base);
+                bmfGetInt(line, "lineHeight", lineHeight);
+                bmfGetInt(line, "base", base);
             } else if (line.rfind("page", 0) == 0) {
-                pageFile = getStr(line, "file");
+                pageFile = bmfGetStr(line, "file");
             } else if (line.rfind("char ", 0) == 0) {
                 int id = -1;
-                if (!getInt(line, "id", id)) continue;
+                if (!bmfGetInt(line, "id", id)) continue;
                 Glyph g;
-                getInt(line, "x", g.x);           getInt(line, "y", g.y);
-                getInt(line, "width", g.w);       getInt(line, "height", g.h);
-                getInt(line, "xoffset", g.xoff);  getInt(line, "yoffset", g.yoff);
-                getInt(line, "xadvance", g.xadv);
+                bmfGetInt(line, "x", g.x);           bmfGetInt(line, "y", g.y);
+                bmfGetInt(line, "width", g.w);       bmfGetInt(line, "height", g.h);
+                bmfGetInt(line, "xoffset", g.xoff);  bmfGetInt(line, "yoffset", g.yoff);
+                bmfGetInt(line, "xadvance", g.xadv);
                 glyphs[static_cast<uint32_t>(id)] = g;
             }
         }
