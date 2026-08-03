@@ -19,7 +19,7 @@ namespace sdlw {
 // Editing keys / command combos reported per-frame by Window (see keyPressed()).
 // The Select/Copy/Cut/Paste entries are the Ctrl+A/C/X/V shortcuts.
 enum class Key {
-    Backspace, Delete, Left, Right, Home, End, Enter, Tab,
+    Backspace, Delete, Left, Right, Up, Down, Home, End, Enter, Tab,
     SelectAll, Copy, Cut, Paste,
     Count
 };
@@ -85,6 +85,10 @@ public:
     // (1 = single, 2 = double, ...). mouseClicks() is 0 when no press occurred.
     bool mousePressed() const;
     int  mouseClicks() const;
+
+    // Vertical mouse-wheel delta accumulated during the most recent
+    // pumpEvents(). Positive = scrolled away from the user (up).
+    float mouseWheel() const;
 
     // Low-level handles for in-house rendering code.
     SDL_Window*   handle() const;

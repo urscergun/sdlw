@@ -42,6 +42,7 @@ struct Window::Impl {
     bool          keys[int(Key::Count)] = {};       // indexed by Key enum
     bool          mousePressed = false;             // left button down this frame
     int           mouseClicks = 0;                  // click count of that press
+    float         mouseWheel = 0;                   // vertical wheel delta this frame
 };
 
 namespace {
@@ -62,6 +63,8 @@ int keyIndex(SDL_Keycode k, SDL_Keymod mod) {
         case SDLK_DELETE:    return int(Key::Delete);
         case SDLK_LEFT:      return int(Key::Left);
         case SDLK_RIGHT:     return int(Key::Right);
+        case SDLK_UP:        return int(Key::Up);
+        case SDLK_DOWN:      return int(Key::Down);
         case SDLK_HOME:      return int(Key::Home);
         case SDLK_END:       return int(Key::End);
         case SDLK_RETURN:    return int(Key::Enter);
@@ -118,6 +121,7 @@ bool Window::pumpEvents() {
     for (bool& k : impl_->keys) k = false;
     impl_->mousePressed = false;
     impl_->mouseClicks = 0;
+    impl_->mouseWheel = 0;
 
     bool running = true;
     SDL_Event ev;
@@ -142,6 +146,9 @@ bool Window::pumpEvents() {
                     impl_->mouseClicks = ev.button.clicks;
                 }
                 break;
+            case SDL_EVENT_MOUSE_WHEEL:
+                impl_->mouseWheel += ev.wheel.y;
+                break;
             default:
                 break;
         }
@@ -164,8 +171,9 @@ bool Window::keyPressed(Key key) const {
     return (idx >= 0 && idx < int(Key::Count)) ? impl_->keys[idx] : false;
 }
 
-bool Window::mousePressed() const { return impl_->mousePressed; }
-int  Window::mouseClicks() const { return impl_->mouseClicks; }
+bool  Window::mousePressed() const { return impl_->mousePressed; }
+int   Window::mouseClicks() const { return impl_->mouseClicks; }
+float Window::mouseWheel() const { return impl_->mouseWheel; }
 
 void Window::clear(unsigned char r, unsigned char g, unsigned char b) {
     if (!impl_->renderer) return;

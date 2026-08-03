@@ -1,4 +1,4 @@
-// Example sdlw application: text, a clickable button, and an editable text box,
+// Example sdlw application: a scrollable ListBox plus a TextBox to add items,
 // all from font atlases embedded in the executable.
 //
 // There is no WinMain/main here — sdlw supplies the platform entry point and
@@ -7,8 +7,10 @@
 #include "sdlw/font.h"
 #include "sdlw/button.h"
 #include "sdlw/textbox.h"
+#include "sdlw/listbox.h"
 
 #include <cstdio>
+#include <string>
 
 // Font atlases + descriptors baked into the executable by CMake (tools/bin2c.cmake).
 #define SDLW_DECL_FONT(sz)                                     \
@@ -25,9 +27,9 @@ int Main(int argc, char** argv) {
     (void)argc; (void)argv;
 
     sdlw::Window win({
-        .title  = "sdlw text box demo",
-        .width  = 520,
-        .height = 300,
+        .title  = "sdlw list box demo",
+        .width  = 560,
+        .height = 360,
     });
     if (!win.ok()) {
         std::fprintf(stderr, "window: %s\n", win.error());
@@ -43,29 +45,40 @@ int Main(int argc, char** argv) {
         return 1;
     }
 
-    sdlw::TextBox name(20, 96, 360, 34);
-    name.setPlaceholder("Type your name...");
+    sdlw::ListBox list(20, 70, 300, 250);
+    list.setItems({
+        "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf",
+        "Hotel", "India", "Juliet", "Kilo", "Lima", "Mike", "November",
+        "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango",
+    });
+    list.setSelected(0);
 
-    sdlw::Button greetBtn("Greet", 396, 96, 100, 34);
-
-    std::string greeting;
+    sdlw::TextBox entry(340, 70, 200, 34);
+    entry.setPlaceholder("New item...");
+    sdlw::Button addBtn("Add", 340, 114, 200, 34);
 
     while (win.pumpEvents()) {
-        name.update(win, ui);
-        if (greetBtn.update()) {
-            greeting = name.text().empty() ? "" : ("Hello, " + name.text() + "!");
+        list.update(win, ui);
+        entry.update(win, ui);
+        if (addBtn.update() && !entry.text().empty()) {
+            list.addItem(entry.text());
+            entry.setText("");
         }
 
         win.clear(24, 24, 32);
+        heading.draw("sdlw list box", 20, 24, 120, 200, 255);
 
-        heading.draw("sdlw text box", 20, 24, 120, 200, 255);
-        ui.draw("Name:", 20, 72, 200, 200, 210);
+        list.draw(win.renderer(), ui);
+        entry.draw(win.renderer(), ui);
+        addBtn.draw(win.renderer(), ui);
 
-        name.draw(win.renderer(), ui);
-        greetBtn.draw(win.renderer(), ui);
-
-        if (!greeting.empty())
-            ui.draw(greeting.c_str(), 20, 160, 150, 230, 170);
+        if (const std::string* sel = list.selectedItem()) {
+            std::string s = "Selected: " + *sel;
+            ui.draw(s.c_str(), 340, 170, 150, 230, 170);
+        }
+        char cnt[48];
+        std::snprintf(cnt, sizeof cnt, "%d items", list.count());
+        ui.draw(cnt, 340, 196, 170, 170, 185);
 
         win.present();
     }
