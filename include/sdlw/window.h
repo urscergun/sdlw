@@ -1,0 +1,79 @@
+// sdlw - a small cross-platform GUI window API built on libSDL.
+//
+// The framework owns the platform entry point (WinMain on Windows, main on
+// Linux) and calls into the single function you provide:
+//
+//     int Main(int argc, char** argv);
+//
+// Everything else here is plain in-house C++; libSDL is the only dependency.
+#pragma once
+
+#include <string>
+
+// Opaque SDL forward declarations so users don't need SDL headers to use the API.
+struct SDL_Window;
+struct SDL_Renderer;
+
+namespace sdlw {
+
+struct WindowConfig {
+    std::string title = "sdlw window";
+    int         width = 800;
+    int         height = 600;
+    bool        resizable = true;
+    bool        vsync = true;
+};
+
+// A single top-level GUI window plus an accelerated renderer.
+//
+// Non-copyable, movable-by-nothing (owns SDL resources). Construct one, check
+// ok(), then drive it from a loop:
+//
+//     sdlw::Window win({.title = "Hello"});
+//     if (!win.ok()) return 1;
+//     while (win.pumpEvents()) {
+//         win.clear(20, 20, 28);
+//         // ... in-house drawing against win.renderer() ...
+//         win.present();
+//     }
+class Window {
+public:
+    explicit Window(const WindowConfig& config = {});
+    ~Window();
+
+    Window(const Window&) = delete;
+    Window& operator=(const Window&) = delete;
+
+    // True if the window and renderer were created successfully.
+    bool ok() const;
+
+    // Drain the OS event queue. Returns false once a quit is requested
+    // (window closed or Escape pressed), true to keep running.
+    bool pumpEvents();
+
+    // Fill the back buffer with an RGB color.
+    void clear(unsigned char r = 0, unsigned char g = 0, unsigned char b = 0);
+
+    // Swap the back buffer to the screen.
+    void present();
+
+    int width() const;
+    int height() const;
+
+    // Low-level handles for in-house rendering code.
+    SDL_Window*   handle() const;
+    SDL_Renderer* renderer() const;
+
+    // Human-readable description of the last failure, or "" if none.
+    const char* error() const;
+
+private:
+    struct Impl;
+    Impl* impl_;
+};
+
+} // namespace sdlw
+
+// You implement this. sdlw provides the platform-specific entry point that
+// initializes SDL and calls it.
+int Main(int argc, char** argv);
