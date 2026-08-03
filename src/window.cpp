@@ -1,9 +1,10 @@
 #include "sdlw/window.h"
 
-// We manage the entry point ourselves (see entry.cpp), so SDL must not
-// redefine main() behind our back.
+// We manage the entry point ourselves (see entry.cpp). SDL3's SDL.h does not
+// hijack main(), but we define this and call SDL_SetMainReady() to be explicit.
 #define SDL_MAIN_HANDLED
-#include <SDL.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h> // for SDL_SetMainReady(); SDL_MAIN_HANDLED keeps main() ours
 
 #include <string>
 
@@ -15,7 +16,7 @@ int  g_initCount = 0;
 bool ensureSdlInit(std::string& err) {
     if (g_initCount == 0) {
         SDL_SetMainReady();
-        if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        if (!SDL_Init(SDL_INIT_VIDEO)) { // SDL3 returns bool: true on success.
             err = SDL_GetError();
             return false;
         }
@@ -43,26 +44,28 @@ Window::Window(const WindowConfig& config) : impl_(new Impl) {
     }
     impl_->sdlOwned = true;
 
-    Uint32 flags = SDL_WINDOW_SHOWN;
+    // SDL3 windows are shown by default; flags are SDL_WindowFlags (64-bit).
+    SDL_WindowFlags flags = 0;
     if (config.resizable) flags |= SDL_WINDOW_RESIZABLE;
 
-    impl_->window = SDL_CreateWindow(
-        config.title.c_str(),
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        config.width, config.height, flags);
+    // SDL3 SDL_CreateWindow takes no position (title, w, h, flags).
+    impl_->window = SDL_CreateWindow(config.title.c_str(),
+                                     config.width, config.height, flags);
     if (!impl_->window) {
         impl_->error = SDL_GetError();
         return;
     }
 
-    Uint32 rflags = SDL_RENDERER_ACCELERATED;
-    if (config.vsync) rflags |= SDL_RENDERER_PRESENTVSYNC;
-
-    impl_->renderer = SDL_CreateRenderer(impl_->window, -1, rflags);
+    // SDL3 SDL_CreateRenderer takes (window, name); NULL picks the best driver.
+    impl_->renderer = SDL_CreateRenderer(impl_->window, nullptr);
     if (!impl_->renderer) {
         impl_->error = SDL_GetError();
         return;
     }
+
+    // VSync is configured separately in SDL3.
+    SDL_SetRenderVSync(impl_->renderer,
+                       config.vsync ? 1 : SDL_RENDERER_VSYNC_DISABLED);
 }
 
 Window::~Window() {
@@ -80,14 +83,13 @@ bool Window::pumpEvents() {
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
         switch (ev.type) {
-            case SDL_QUIT:
+            case SDL_EVENT_QUIT:
                 return false;
-            case SDL_KEYDOWN:
-                if (ev.key.keysym.sym == SDLK_ESCAPE) return false;
+            case SDL_EVENT_KEY_DOWN:
+                if (ev.key.key == SDLK_ESCAPE) return false;
                 break;
-            case SDL_WINDOWEVENT:
-                if (ev.window.event == SDL_WINDOWEVENT_CLOSE) return false;
-                break;
+            case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                return false;
             default:
                 break;
         }
