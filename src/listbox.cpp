@@ -36,6 +36,25 @@ float ListBox::maxScroll(Font& font) const {
     return std::max(0.0f, contentH - viewH);
 }
 
+bool ListBox::scrollbarMetrics(Font& font, float& trackX, float& trackW,
+                               float& trackTop, float& trackH,
+                               float& thumbY, float& thumbH) const {
+    int rh = font.lineHeight() + rowPad_;
+    float contentH = float(count() * rh);
+    float viewH = h_ - 2;
+    if (contentH <= viewH || contentH <= 0) return false;
+
+    trackW   = 5.0f;
+    trackX   = x_ + w_ - 7.0f;
+    trackTop = y_ + 1.0f;
+    trackH   = viewH;
+    thumbH   = std::max(20.0f, trackH * (viewH / contentH));
+    float maxS = contentH - viewH;
+    float t = (maxS > 0) ? (scroll_ / maxS) : 0.0f;
+    thumbY   = trackTop + t * (trackH - thumbH);
+    return true;
+}
+
 void ListBox::scrollToSelected(Font& font) {
     if (selected_ < 0) return;
     int rh = rowHeight(font);
@@ -51,12 +70,18 @@ bool ListBox::update(Window& win, Font& font) {
     int prevSelected = selected_;
 
     float mx = 0, my = 0;
-    SDL_GetMouseState(&mx, &my);
+    bool down = (SDL_GetMouseState(&mx, &my) & SDL_BUTTON_LMASK) != 0;
     bool inside = (mx >= x_ && mx < x_ + w_ && my >= y_ && my < y_ + h_);
 
-    // Hover + which row is under the cursor.
+    // Scrollbar geometry + whether the cursor is over its column.
+    float bx, bw, bt, bh, ty, th;
+    bool hasBar = scrollbarMetrics(font, bx, bw, bt, bh, ty, th);
+    bool overBar = hasBar && mx >= x_ + w_ - 10 && mx < x_ + w_ &&
+                   my >= y_ && my < y_ + h_;
+
+    // Hover + which row is under the cursor (suppressed over the scrollbar).
     hover_ = -1;
-    if (inside) {
+    if (inside && !overBar) {
         int row = int((my - y_ - 1 + scroll_) / rh);
         if (row >= 0 && row < count()) hover_ = row;
     }
@@ -66,11 +91,29 @@ bool ListBox::update(Window& win, Font& font) {
         scroll_ -= win.mouseWheel() * rh * 3.0f;
     }
 
-    // Click to focus + select.
+    // Press: start a scrollbar drag, page the track, or select an item.
     if (win.mousePressed()) {
         focused_ = inside;
-        if (inside && hover_ >= 0) selected_ = hover_;
+        if (overBar) {
+            if (my >= ty && my < ty + th) {          // grabbed the thumb
+                draggingBar_ = true;
+                grabOffset_ = my - ty;
+            } else {                                  // clicked the track: page
+                float viewH = h_ - 2;
+                scroll_ += (my < ty) ? -viewH : viewH;
+            }
+        } else if (inside && hover_ >= 0) {
+            selected_ = hover_;
+        }
     }
+
+    // Drag the thumb: map its position back to a scroll offset.
+    if (down && draggingBar_ && hasBar) {
+        float denom = bh - th;                        // trackH - thumbH
+        float t = (denom > 0) ? (my - grabOffset_ - bt) / denom : 0.0f;
+        scroll_ = std::clamp(t, 0.0f, 1.0f) * maxScroll(font);
+    }
+    if (!down) draggingBar_ = false;
 
     // Keyboard navigation while focused.
     if (focused_ && count() > 0) {
@@ -131,17 +174,15 @@ void ListBox::draw(SDL_Renderer* renderer, Font& font) {
     SDL_SetRenderDrawColor(renderer, style_.border[0], style_.border[1], style_.border[2], 255);
     SDL_RenderRect(renderer, &rect);
 
-    // Scrollbar thumb (only when content overflows).
-    float contentH = float(count() * rh);
-    float viewH = h_ - 2;
-    if (contentH > viewH) {
-        float trackH = viewH;
-        float thumbH = std::max(20.0f, trackH * (viewH / contentH));
-        float maxS = maxScroll(font);
-        float t = (maxS > 0) ? (scroll_ / maxS) : 0.0f;
-        float thumbY = y_ + 1 + t * (trackH - thumbH);
-        SDL_FRect thumb{ x_ + w_ - 7, thumbY, 5.0f, thumbH };
-        SDL_SetRenderDrawColor(renderer, style_.scrollThumb[0], style_.scrollThumb[1], style_.scrollThumb[2], 255);
+    // Scrollbar thumb (only when content overflows); brighter while dragging.
+    float bx, bw, bt, bh, ty, th;
+    if (scrollbarMetrics(font, bx, bw, bt, bh, ty, th)) {
+        int boost = draggingBar_ ? 40 : 0;
+        SDL_SetRenderDrawColor(renderer,
+            std::min(255, style_.scrollThumb[0] + boost),
+            std::min(255, style_.scrollThumb[1] + boost),
+            std::min(255, style_.scrollThumb[2] + boost), 255);
+        SDL_FRect thumb{ bx, ty, bw, th };
         SDL_RenderFillRect(renderer, &thumb);
     }
 }
