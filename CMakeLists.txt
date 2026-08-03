@@ -62,10 +62,16 @@ function(sdlw_embed_asset input symbol out_var)
     set(${out_var} "${out}" PARENT_SCOPE)
 endfunction()
 
-sdlw_embed_asset(${CMAKE_CURRENT_SOURCE_DIR}/assets/dejavusans_14.fnt dejavusans_14_fnt FNT_C)
-sdlw_embed_asset(${CMAKE_CURRENT_SOURCE_DIR}/assets/dejavusans_14.bmp dejavusans_14_bmp BMP_C)
+# Bake every DejaVu Sans size into the executable.
+set(SDLW_FONT_SIZES 14 16 20 24 32)
+set(SDLW_EMBEDDED_ASSETS "")
+foreach(sz IN LISTS SDLW_FONT_SIZES)
+    sdlw_embed_asset(${CMAKE_CURRENT_SOURCE_DIR}/assets/dejavusans_${sz}.fnt dejavusans_${sz}_fnt FNT_C)
+    sdlw_embed_asset(${CMAKE_CURRENT_SOURCE_DIR}/assets/dejavusans_${sz}.bmp dejavusans_${sz}_bmp BMP_C)
+    list(APPEND SDLW_EMBEDDED_ASSETS ${FNT_C} ${BMP_C})
+endforeach()
 
 # Example GUI app. On Windows, WIN32 makes it a GUI-subsystem exe (uses WinMain).
-# The generated .c files bake the font atlas + descriptor into the executable.
-add_executable(sdlw_example WIN32 example/main.cpp ${FNT_C} ${BMP_C})
+# The generated .c files bake the font atlases + descriptors into the executable.
+add_executable(sdlw_example WIN32 example/main.cpp ${SDLW_EMBEDDED_ASSETS})
 target_link_libraries(sdlw_example PRIVATE sdlw)

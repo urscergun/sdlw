@@ -1,68 +1,73 @@
-// Example sdlw application: render multi-line text from a baked bitmap font.
+// Example sdlw application: render text at several baked font sizes.
 //
 // There is no WinMain/main here — sdlw supplies the platform entry point and
-// calls Main(). Pass the .fnt path as argv[1], or it defaults to the baked
-// DejaVu Sans atlas under assets/.
+// calls Main(). All font atlases are embedded in the executable, so no external
+// files are needed.
 #include "sdlw/window.h"
 #include "sdlw/font.h"
 
 #include <cstdio>
 
-// Font atlas + descriptor baked into the executable by CMake (tools/bin2c.cmake).
-extern "C" {
-    extern const unsigned char dejavusans_14_fnt[];
-    extern const unsigned int  dejavusans_14_fnt_len;
-    extern const unsigned char dejavusans_14_bmp[];
-    extern const unsigned int  dejavusans_14_bmp_len;
-}
+// Font atlases + descriptors baked into the executable by CMake (tools/bin2c.cmake).
+#define SDLW_DECL_FONT(sz)                                     \
+    extern "C" {                                               \
+        extern const unsigned char dejavusans_##sz##_fnt[];    \
+        extern const unsigned int  dejavusans_##sz##_fnt_len;  \
+        extern const unsigned char dejavusans_##sz##_bmp[];    \
+        extern const unsigned int  dejavusans_##sz##_bmp_len;  \
+    }
+SDLW_DECL_FONT(14)
+SDLW_DECL_FONT(16)
+SDLW_DECL_FONT(20)
+SDLW_DECL_FONT(24)
+SDLW_DECL_FONT(32)
 
 int Main(int argc, char** argv) {
+    (void)argc; (void)argv;
+
     sdlw::Window win({
         .title  = "sdlw text demo",
-        .width  = 640,
-        .height = 360,
+        .width  = 720,
+        .height = 420,
     });
     if (!win.ok()) {
         std::fprintf(stderr, "window: %s\n", win.error());
         return 1;
     }
 
-    sdlw::Font font;
-    // Default: use the embedded font (no external files needed). Pass a .fnt
-    // path as argv[1] to load from disk instead (handy while iterating).
-    bool loaded = (argc > 1)
-        ? font.load(win.renderer(), argv[1])
-        : font.loadFromMemory(win.renderer(),
-                              dejavusans_14_fnt, dejavusans_14_fnt_len,
-                              dejavusans_14_bmp, dejavusans_14_bmp_len);
-    if (!loaded) {
-        std::fprintf(stderr, "font: %s\n", font.error());
-        return 1;
+    // Load each embedded size into its own Font.
+    struct Sized { int size; sdlw::Font font;
+                   const unsigned char* fnt; unsigned int fntLen;
+                   const unsigned char* bmp; unsigned int bmpLen; };
+#define SDLW_ENTRY(sz) { sz, {}, dejavusans_##sz##_fnt, dejavusans_##sz##_fnt_len, \
+                                dejavusans_##sz##_bmp, dejavusans_##sz##_bmp_len }
+    Sized fonts[] = {
+        SDLW_ENTRY(32), SDLW_ENTRY(24), SDLW_ENTRY(20),
+        SDLW_ENTRY(16), SDLW_ENTRY(14),
+    };
+    for (auto& f : fonts) {
+        if (!f.font.loadFromMemory(win.renderer(), f.fnt, f.fntLen, f.bmp, f.bmpLen)) {
+            std::fprintf(stderr, "font %dpx: %s\n", f.size, f.font.error());
+            return 1;
+        }
     }
-
-    const char* heading = "sdlw — bitmap font demo";
-    const char* body =
-        "DejaVu Sans, baked offline to a BMP atlas at 14px.\n"
-        "The runtime links only SDL; glyphs are blitted from\n"
-        "the atlas using the .fnt metrics.\n"
-        "\n"
-        "The quick brown fox jumps over the lazy dog.\n"
-        "0123456789  !@#$%^&*()_+-=[]{};:'\",.<>/?\\|`~\n"
-        "Ascenders/descenders: Ag Bj Ky Qp  |  tint below:";
 
     while (win.pumpEvents()) {
         win.clear(24, 24, 32);
 
-        int x = 20, y = 20;
-        font.draw(heading, float(x), float(y), 120, 200, 255);        // light blue
-        y += font.lineHeight() + 6;
-        font.draw(body, float(x), float(y), 230, 230, 235);           // near-white
+        // Heading in the largest size.
+        int x = 20, y = 16;
+        fonts[0].font.draw("sdlw — DejaVu Sans", float(x), float(y), 120, 200, 255);
+        y += fonts[0].font.lineHeight() + 10;
 
-        // A few tinted lines to show color-mod tinting from one atlas.
-        int ty = y + 7 * font.lineHeight() + 6;
-        font.draw("Red line",    float(x),       float(ty), 235,  90,  90);
-        font.draw("Green line",  float(x + 110), float(ty),  90, 210, 120);
-        font.draw("Amber line",  float(x + 230), float(ty), 240, 190,  70);
+        // One line per size, labelled, showing the crispness at each.
+        char line[96];
+        for (auto& f : fonts) {
+            std::snprintf(line, sizeof line,
+                          "%dpx  The quick brown fox jumps over the lazy dog", f.size);
+            f.font.draw(line, float(x), float(y), 230, 230, 235);
+            y += f.font.lineHeight() + 4;
+        }
 
         win.present();
     }
