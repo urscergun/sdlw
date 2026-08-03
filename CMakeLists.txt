@@ -24,11 +24,11 @@ else()
     add_subdirectory(vendor/SDL EXCLUDE_FROM_ALL)
 endif()
 
-# Alias so the rest of the file links the same target name either way.
+# Pick the SDL3 target to link (can't ALIAS an ALIAS, so use a variable).
 if(TARGET SDL3::SDL3-static)
-    add_library(sdlw::sdl ALIAS SDL3::SDL3-static)
+    set(SDLW_SDL_TARGET SDL3::SDL3-static)
 elseif(TARGET SDL3::SDL3)
-    add_library(sdlw::sdl ALIAS SDL3::SDL3)
+    set(SDLW_SDL_TARGET SDL3::SDL3)
 else()
     message(FATAL_ERROR "No SDL3 target found")
 endif()
@@ -39,7 +39,7 @@ add_library(sdlw STATIC
     src/entry.cpp
 )
 target_include_directories(sdlw PUBLIC include)
-target_link_libraries(sdlw PUBLIC sdlw::sdl)
+target_link_libraries(sdlw PUBLIC ${SDLW_SDL_TARGET})
 
 # Example GUI app. On Windows, WIN32 makes it a GUI-subsystem exe (uses WinMain).
 add_executable(sdlw_example WIN32 example/main.cpp)
