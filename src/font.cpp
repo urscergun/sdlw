@@ -76,6 +76,66 @@ struct Font::Impl {
         auto it = glyphs.find(cp);
         return it == glyphs.end() ? nullptr : &it->second;
     }
+
+    // Parse a BMFont descriptor into glyphs/metrics; returns the page filename.
+    std::string parseDescriptor(const std::string& text) {
+        std::string pageFile;
+        size_t start = 0;
+        while (start <= text.size()) {
+            size_t nl = text.find('\n', start);
+            std::string line = text.substr(start, nl == std::string::npos ? std::string::npos : nl - start);
+            if (!line.empty() && line.back() == '\r') line.pop_back();
+            start = (nl == std::string::npos) ? text.size() + 1 : nl + 1;
+
+            if (line.rfind("common", 0) == 0) {
+                getInt(line, "lineHeight", lineHeight);
+                getInt(line, "base", base);
+            } else if (line.rfind("page", 0) == 0) {
+                pageFile = getStr(line, "file");
+            } else if (line.rfind("char ", 0) == 0) {
+                int id = -1;
+                if (!getInt(line, "id", id)) continue;
+                Glyph g;
+                getInt(line, "x", g.x);           getInt(line, "y", g.y);
+                getInt(line, "width", g.w);       getInt(line, "height", g.h);
+                getInt(line, "xoffset", g.xoff);  getInt(line, "yoffset", g.yoff);
+                getInt(line, "xadvance", g.xadv);
+                glyphs[static_cast<uint32_t>(id)] = g;
+            }
+        }
+        return pageFile;
+    }
+
+    // Turn a loaded atlas surface (white glyphs on black) into an alpha
+    // texture; consumes (destroys) `bmp`. Sets error on failure.
+    bool buildAtlas(SDL_Surface* bmp) {
+        if (!bmp) { error = std::string("load atlas: ") + SDL_GetError(); return false; }
+        SDL_Surface* rgba = SDL_ConvertSurface(bmp, SDL_PIXELFORMAT_RGBA32);
+        SDL_DestroySurface(bmp);
+        if (!rgba) { error = std::string("convert atlas: ") + SDL_GetError(); return false; }
+
+        const int w = rgba->w, h = rgba->h;
+        std::vector<unsigned char> pixels(static_cast<size_t>(w) * h * 4);
+        for (int row = 0; row < h; ++row) {
+            const unsigned char* src = static_cast<unsigned char*>(rgba->pixels) + row * rgba->pitch;
+            unsigned char* dst = pixels.data() + static_cast<size_t>(row) * w * 4;
+            for (int col = 0; col < w; ++col) {
+                unsigned char coverage = src[col * 4]; // R channel (R==G==B here)
+                dst[col * 4 + 0] = 255;
+                dst[col * 4 + 1] = 255;
+                dst[col * 4 + 2] = 255;
+                dst[col * 4 + 3] = coverage;
+            }
+        }
+        SDL_DestroySurface(rgba);
+
+        texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
+                                    SDL_TEXTUREACCESS_STATIC, w, h);
+        if (!texture) { error = std::string("create texture: ") + SDL_GetError(); return false; }
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+        SDL_UpdateTexture(texture, nullptr, pixels.data(), w * 4);
+        return true;
+    }
 };
 
 Font::Font() : impl_(new Impl) {}
@@ -90,7 +150,6 @@ bool Font::load(SDL_Renderer* renderer, const std::string& fntPath) {
 
     SDL_IOStream* io = SDL_IOFromFile(fntPath.c_str(), "r");
     if (!io) { impl_->error = std::string("open .fnt: ") + SDL_GetError(); return false; }
-    // Read the whole descriptor into a string.
     Sint64 sz = SDL_GetIOSize(io);
     std::string text;
     if (sz > 0) {
@@ -99,65 +158,27 @@ bool Font::load(SDL_Renderer* renderer, const std::string& fntPath) {
     }
     SDL_CloseIO(io);
 
-    std::string pageFile;
-    // Parse line by line.
-    size_t start = 0;
-    while (start <= text.size()) {
-        size_t nl = text.find('\n', start);
-        std::string line = text.substr(start, nl == std::string::npos ? std::string::npos : nl - start);
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        start = (nl == std::string::npos) ? text.size() + 1 : nl + 1;
-
-        if (line.rfind("common", 0) == 0) {
-            getInt(line, "lineHeight", impl_->lineHeight);
-            getInt(line, "base", impl_->base);
-        } else if (line.rfind("page", 0) == 0) {
-            pageFile = getStr(line, "file");
-        } else if (line.rfind("char ", 0) == 0) {
-            int id = -1;
-            if (!getInt(line, "id", id)) continue;
-            Glyph g;
-            getInt(line, "x", g.x);           getInt(line, "y", g.y);
-            getInt(line, "width", g.w);       getInt(line, "height", g.h);
-            getInt(line, "xoffset", g.xoff);  getInt(line, "yoffset", g.yoff);
-            getInt(line, "xadvance", g.xadv);
-            impl_->glyphs[static_cast<uint32_t>(id)] = g;
-        }
-    }
-
+    std::string pageFile = impl_->parseDescriptor(text);
     if (pageFile.empty()) { impl_->error = "descriptor has no page file"; return false; }
 
-    // Load the atlas BMP (white glyphs on black; luminance == coverage).
     std::string bmpPath = dirOf(fntPath) + pageFile;
     SDL_Surface* bmp = SDL_LoadBMP(bmpPath.c_str());
     if (!bmp) { impl_->error = std::string("load atlas '") + bmpPath + "': " + SDL_GetError(); return false; }
+    return impl_->buildAtlas(bmp);
+}
 
-    SDL_Surface* rgba = SDL_ConvertSurface(bmp, SDL_PIXELFORMAT_RGBA32);
-    SDL_DestroySurface(bmp);
-    if (!rgba) { impl_->error = std::string("convert atlas: ") + SDL_GetError(); return false; }
+bool Font::loadFromMemory(SDL_Renderer* renderer,
+                          const unsigned char* fnt, unsigned int fntLen,
+                          const unsigned char* bmp, unsigned int bmpLen) {
+    impl_->renderer = renderer;
 
-    // Rebuild pixels as white with alpha = coverage, so color-mod tinting works.
-    const int w = rgba->w, h = rgba->h;
-    std::vector<unsigned char> pixels(static_cast<size_t>(w) * h * 4);
-    for (int row = 0; row < h; ++row) {
-        const unsigned char* src = static_cast<unsigned char*>(rgba->pixels) + row * rgba->pitch;
-        unsigned char* dst = pixels.data() + static_cast<size_t>(row) * w * 4;
-        for (int col = 0; col < w; ++col) {
-            unsigned char coverage = src[col * 4]; // R channel (R==G==B here)
-            dst[col * 4 + 0] = 255;
-            dst[col * 4 + 1] = 255;
-            dst[col * 4 + 2] = 255;
-            dst[col * 4 + 3] = coverage;
-        }
-    }
-    SDL_DestroySurface(rgba);
+    std::string text(reinterpret_cast<const char*>(fnt), fntLen);
+    impl_->parseDescriptor(text); // page filename is irrelevant in memory mode
 
-    impl_->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32,
-                                       SDL_TEXTUREACCESS_STATIC, w, h);
-    if (!impl_->texture) { impl_->error = std::string("create texture: ") + SDL_GetError(); return false; }
-    SDL_SetTextureBlendMode(impl_->texture, SDL_BLENDMODE_BLEND);
-    SDL_UpdateTexture(impl_->texture, nullptr, pixels.data(), w * 4);
-    return true;
+    SDL_IOStream* io = SDL_IOFromConstMem(bmp, bmpLen);
+    if (!io) { impl_->error = std::string("atlas mem io: ") + SDL_GetError(); return false; }
+    SDL_Surface* surf = SDL_LoadBMP_IO(io, true /*closeio*/);
+    return impl_->buildAtlas(surf);
 }
 
 bool Font::ok() const { return impl_->texture != nullptr; }

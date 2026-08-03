@@ -8,9 +8,15 @@
 
 #include <cstdio>
 
-int Main(int argc, char** argv) {
-    const char* fontPath = (argc > 1) ? argv[1] : "assets/dejavusans_14.fnt";
+// Font atlas + descriptor baked into the executable by CMake (tools/bin2c.cmake).
+extern "C" {
+    extern const unsigned char dejavusans_14_fnt[];
+    extern const unsigned int  dejavusans_14_fnt_len;
+    extern const unsigned char dejavusans_14_bmp[];
+    extern const unsigned int  dejavusans_14_bmp_len;
+}
 
+int Main(int argc, char** argv) {
     sdlw::Window win({
         .title  = "sdlw text demo",
         .width  = 640,
@@ -22,9 +28,15 @@ int Main(int argc, char** argv) {
     }
 
     sdlw::Font font;
-    if (!font.load(win.renderer(), fontPath)) {
+    // Default: use the embedded font (no external files needed). Pass a .fnt
+    // path as argv[1] to load from disk instead (handy while iterating).
+    bool loaded = (argc > 1)
+        ? font.load(win.renderer(), argv[1])
+        : font.loadFromMemory(win.renderer(),
+                              dejavusans_14_fnt, dejavusans_14_fnt_len,
+                              dejavusans_14_bmp, dejavusans_14_bmp_len);
+    if (!loaded) {
         std::fprintf(stderr, "font: %s\n", font.error());
-        std::fprintf(stderr, "(pass the .fnt path as the first argument, or run from the project root)\n");
         return 1;
     }
 

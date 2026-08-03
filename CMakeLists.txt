@@ -43,6 +43,29 @@ add_library(sdlw STATIC
 target_include_directories(sdlw PUBLIC include)
 target_link_libraries(sdlw PUBLIC ${SDLW_SDL_TARGET})
 
+# --- Asset embedding -------------------------------------------------------
+# Turn a binary asset into a compiled C byte array (regenerated when it
+# changes). Fully in-house: just CMake + the C compiler, no extra tools.
+set(SDLW_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+file(MAKE_DIRECTORY ${SDLW_GEN_DIR})
+
+function(sdlw_embed_asset input symbol out_var)
+    set(out "${SDLW_GEN_DIR}/${symbol}.c")
+    add_custom_command(
+        OUTPUT  "${out}"
+        COMMAND ${CMAKE_COMMAND}
+                -DINPUT=${input} -DOUTPUT=${out} -DSYMBOL=${symbol}
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/bin2c.cmake
+        DEPENDS ${input} ${CMAKE_CURRENT_SOURCE_DIR}/tools/bin2c.cmake
+        COMMENT "Embedding ${input}"
+        VERBATIM)
+    set(${out_var} "${out}" PARENT_SCOPE)
+endfunction()
+
+sdlw_embed_asset(${CMAKE_CURRENT_SOURCE_DIR}/assets/dejavusans_14.fnt dejavusans_14_fnt FNT_C)
+sdlw_embed_asset(${CMAKE_CURRENT_SOURCE_DIR}/assets/dejavusans_14.bmp dejavusans_14_bmp BMP_C)
+
 # Example GUI app. On Windows, WIN32 makes it a GUI-subsystem exe (uses WinMain).
-add_executable(sdlw_example WIN32 example/main.cpp)
+# The generated .c files bake the font atlas + descriptor into the executable.
+add_executable(sdlw_example WIN32 example/main.cpp ${FNT_C} ${BMP_C})
 target_link_libraries(sdlw_example PRIVATE sdlw)

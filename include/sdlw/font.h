@@ -25,6 +25,13 @@ public:
     // for later draw() calls. Returns false on failure (see error()).
     bool load(SDL_Renderer* renderer, const std::string& fntPath);
 
+    // Load from in-memory buffers instead of files — e.g. assets embedded in
+    // the executable. `fnt` is the BMFont descriptor text; `bmp` is the raw
+    // bytes of the atlas .bmp (the descriptor's page filename is ignored).
+    bool loadFromMemory(SDL_Renderer* renderer,
+                        const unsigned char* fnt, unsigned int fntLen,
+                        const unsigned char* bmp, unsigned int bmpLen);
+
     bool ok() const;
 
     // Draw UTF-8 text with the top-left of the text block at (x, y).
