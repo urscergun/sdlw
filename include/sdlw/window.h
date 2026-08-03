@@ -16,6 +16,9 @@ struct SDL_Renderer;
 
 namespace sdlw {
 
+// Editing keys reported per-frame by Window (see keyPressed()).
+enum class Key { Backspace, Delete, Left, Right, Home, End, Enter, Tab };
+
 struct WindowConfig {
     std::string title = "sdlw window";
     int         width = 800;
@@ -59,6 +62,19 @@ public:
 
     int width() const;
     int height() const;
+
+    // --- Text/keyboard input -----------------------------------------------
+    // Enable/disable OS text input (IME-aware). A text widget calls these as it
+    // gains/loses focus so that textInput() starts/stops delivering characters.
+    void startTextInput();
+    void stopTextInput();
+
+    // UTF-8 text typed during the most recent pumpEvents() (empty if none).
+    const char* textInput() const;
+
+    // True if `key` was pressed (or auto-repeated) during the most recent
+    // pumpEvents(). Edge/repeat-triggered, for editing controls.
+    bool keyPressed(Key key) const;
 
     // Low-level handles for in-house rendering code.
     SDL_Window*   handle() const;

@@ -1,11 +1,12 @@
-// Example sdlw application: text + clickable buttons from embedded assets.
+// Example sdlw application: text, a clickable button, and an editable text box,
+// all from font atlases embedded in the executable.
 //
 // There is no WinMain/main here — sdlw supplies the platform entry point and
-// calls Main(). Font atlases are embedded in the executable, so no external
-// files are needed.
+// calls Main().
 #include "sdlw/window.h"
 #include "sdlw/font.h"
 #include "sdlw/button.h"
+#include "sdlw/textbox.h"
 
 #include <cstdio>
 
@@ -24,9 +25,9 @@ int Main(int argc, char** argv) {
     (void)argc; (void)argv;
 
     sdlw::Window win({
-        .title  = "sdlw button demo",
+        .title  = "sdlw text box demo",
         .width  = 520,
-        .height = 260,
+        .height = 300,
     });
     if (!win.ok()) {
         std::fprintf(stderr, "window: %s\n", win.error());
@@ -42,27 +43,29 @@ int Main(int argc, char** argv) {
         return 1;
     }
 
-    sdlw::Button clickBtn("Click me", 20, 90, 140, 44);
-    sdlw::Button resetBtn("Reset",   176, 90,  90, 44);
-    // Give reset a warmer tint.
-    resetBtn.style().hover[0] = 120; resetBtn.style().hover[1] = 70; resetBtn.style().hover[2] = 70;
+    sdlw::TextBox name(20, 96, 360, 34);
+    name.setPlaceholder("Type your name...");
 
-    int clicks = 0;
+    sdlw::Button greetBtn("Greet", 396, 96, 100, 34);
+
+    std::string greeting;
 
     while (win.pumpEvents()) {
-        if (clickBtn.update()) ++clicks;
-        if (resetBtn.update()) clicks = 0;
+        name.update(win);
+        if (greetBtn.update()) {
+            greeting = name.text().empty() ? "" : ("Hello, " + name.text() + "!");
+        }
 
         win.clear(24, 24, 32);
 
-        heading.draw("sdlw buttons", 20, 20, 120, 200, 255);
+        heading.draw("sdlw text box", 20, 24, 120, 200, 255);
+        ui.draw("Name:", 20, 72, 200, 200, 210);
 
-        clickBtn.draw(win.renderer(), ui);
-        resetBtn.draw(win.renderer(), ui);
+        name.draw(win.renderer(), ui);
+        greetBtn.draw(win.renderer(), ui);
 
-        char status[64];
-        std::snprintf(status, sizeof status, "Clicks: %d", clicks);
-        ui.draw(status, 20, 160, 230, 230, 235);
+        if (!greeting.empty())
+            ui.draw(greeting.c_str(), 20, 160, 150, 230, 170);
 
         win.present();
     }

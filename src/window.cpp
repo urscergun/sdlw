@@ -36,7 +36,28 @@ struct Window::Impl {
     SDL_Renderer* renderer = nullptr;
     std::string   error;
     bool          sdlOwned = false;
+
+    // Per-frame input, refreshed by pumpEvents().
+    std::string   frameText;                 // UTF-8 typed this frame
+    bool          keys[8] = {};              // indexed by Key enum
 };
+
+namespace {
+// Map an SDL keycode to a sdlw::Key index, or -1 if not an editing key.
+int keyIndex(SDL_Keycode k) {
+    switch (k) {
+        case SDLK_BACKSPACE: return int(Key::Backspace);
+        case SDLK_DELETE:    return int(Key::Delete);
+        case SDLK_LEFT:      return int(Key::Left);
+        case SDLK_RIGHT:     return int(Key::Right);
+        case SDLK_HOME:      return int(Key::Home);
+        case SDLK_END:       return int(Key::End);
+        case SDLK_RETURN:    return int(Key::Enter);
+        case SDLK_TAB:       return int(Key::Tab);
+        default:             return -1;
+    }
+}
+} // namespace
 
 Window::Window(const WindowConfig& config) : impl_(new Impl) {
     if (!ensureSdlInit(impl_->error)) {
@@ -80,21 +101,47 @@ bool Window::ok() const {
 }
 
 bool Window::pumpEvents() {
+    // Reset per-frame input.
+    impl_->frameText.clear();
+    for (bool& k : impl_->keys) k = false;
+
+    bool running = true;
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
         switch (ev.type) {
             case SDL_EVENT_QUIT:
-                return false;
-            case SDL_EVENT_KEY_DOWN:
-                if (ev.key.key == SDLK_ESCAPE) return false;
-                break;
             case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-                return false;
+                running = false;
+                break;
+            case SDL_EVENT_KEY_DOWN: {
+                if (ev.key.key == SDLK_ESCAPE) { running = false; break; }
+                int idx = keyIndex(ev.key.key);
+                if (idx >= 0) impl_->keys[idx] = true;
+                break;
+            }
+            case SDL_EVENT_TEXT_INPUT:
+                if (ev.text.text) impl_->frameText += ev.text.text;
+                break;
             default:
                 break;
         }
     }
-    return true;
+    return running;
+}
+
+void Window::startTextInput() {
+    if (impl_->window) SDL_StartTextInput(impl_->window);
+}
+
+void Window::stopTextInput() {
+    if (impl_->window) SDL_StopTextInput(impl_->window);
+}
+
+const char* Window::textInput() const { return impl_->frameText.c_str(); }
+
+bool Window::keyPressed(Key key) const {
+    int idx = int(key);
+    return (idx >= 0 && idx < 8) ? impl_->keys[idx] : false;
 }
 
 void Window::clear(unsigned char r, unsigned char g, unsigned char b) {
