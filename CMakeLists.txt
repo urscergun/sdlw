@@ -38,6 +38,7 @@ endif()
 add_library(sdlw STATIC
     src/window.cpp
     src/entry.cpp
+    src/font.cpp
 )
 target_include_directories(sdlw PUBLIC include)
 target_link_libraries(sdlw PUBLIC ${SDLW_SDL_TARGET})
