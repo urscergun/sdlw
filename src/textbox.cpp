@@ -33,23 +33,23 @@ int charClass(unsigned char c) {
     if (c >= 0x80 || c == '_' || std::isalnum(c)) return 1;
     return 2;
 }
-// Ctrl+Left: skip whitespace to the left, then the run of same-class chars.
+bool isSpace(const std::string& s, std::size_t i) {
+    return charClass(static_cast<unsigned char>(s[i])) == 0;
+}
+// Word jump stops at the next space/graphic boundary, moving over exactly one
+// run: from a graphic char, stop before the first space; from a space, stop
+// before the first graphic char.
 std::size_t wordLeft(const std::string& s, std::size_t i) {
-    while (i > 0 && charClass(static_cast<unsigned char>(s[i - 1])) == 0) --i;
-    if (i > 0) {
-        int cls = charClass(static_cast<unsigned char>(s[i - 1]));
-        while (i > 0 && charClass(static_cast<unsigned char>(s[i - 1])) == cls) --i;
-    }
+    if (i == 0) return 0;
+    bool sp = isSpace(s, i - 1);
+    while (i > 0 && isSpace(s, i - 1) == sp) --i;
     return i;
 }
-// Ctrl+Right: skip the current run, then following whitespace (to next word start).
 std::size_t wordRight(const std::string& s, std::size_t i) {
     std::size_t n = s.size();
-    if (i < n) {
-        int cls = charClass(static_cast<unsigned char>(s[i]));
-        while (i < n && charClass(static_cast<unsigned char>(s[i])) == cls) ++i;
-    }
-    while (i < n && charClass(static_cast<unsigned char>(s[i])) == 0) ++i;
+    if (i >= n) return n;
+    bool sp = isSpace(s, i);
+    while (i < n && isSpace(s, i) == sp) ++i;
     return i;
 }
 // Bounds of the run of same-class characters around byte index i (for double-click).
@@ -120,13 +120,18 @@ void TextBox::update(Window& win, Font& font) {
     if (win.mousePressed()) {                 // press edge (from event)
         setFocused(inside, win);
         if (inside) {
-            std::size_t hit = indexFromX(font, text_, localX);
-            if (win.mouseClicks() >= 2) {     // double-click selects the word
-                auto [lo, hi] = wordBounds(text_, hit);
+            int clicks = win.mouseClicks();
+            if (clicks >= 3) {                // triple-click selects all (like Ctrl+A)
+                sel_ = 0;
+                caret_ = text_.size();
+                dragging_ = false;
+            } else if (clicks == 2) {         // double-click selects the word
+                auto [lo, hi] = wordBounds(text_, indexFromX(font, text_, localX));
                 sel_ = lo;
                 caret_ = hi;
                 dragging_ = false;
-            } else {
+            } else {                          // single click places the caret
+                std::size_t hit = indexFromX(font, text_, localX);
                 caret_ = hit;
                 if (!shift) sel_ = hit;       // shift-click extends existing selection
                 dragging_ = true;
