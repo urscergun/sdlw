@@ -8,6 +8,9 @@
 #include "sdlw/button.h"
 #include "sdlw/textbox.h"
 #include "sdlw/combobox.h"
+#include "sdlw/checkbox.h"
+#include "sdlw/radiogroup.h"
+#include "sdlw/select.h"
 
 #include <string>
 
@@ -119,6 +122,58 @@ TEST(combo_click_commits_and_reopen_browses_all) {
     combo.update(win, font);
     CHECK(combo.isOpen());
     CHECK_EQ(combo.list().count(), 5); // full list again
+}
+
+TEST(checkbox_toggles_on_click) {
+    Window win{Window::Headless{}};
+    Checkbox cb("Agree", 0, 0, 200, 24);
+    CHECK(!cb.checked());
+    // Press inside toggles on.
+    win.clearFrameInput(); win.feedMouse(10, 10, true); win.feedMousePress(1);
+    CHECK(cb.update(win));
+    CHECK(cb.checked());
+    // Press again toggles off.
+    win.clearFrameInput(); win.feedMouse(10, 10, true); win.feedMousePress(1);
+    CHECK(cb.update(win));
+    CHECK(!cb.checked());
+    // Press outside does nothing.
+    win.clearFrameInput(); win.feedMouse(500, 500, true); win.feedMousePress(1);
+    CHECK(!cb.update(win));
+    CHECK(!cb.checked());
+}
+
+TEST(radiogroup_single_selection) {
+    Window win{Window::Headless{}};
+    RadioGroup rg(0, 0, 200, { "Light", "Dark", "System" }, 26); // rows at y 0,26,52
+    CHECK_EQ(rg.selected(), 0);                 // first selected by default
+    // Click the third row (y in [52,78)).
+    win.clearFrameInput(); win.feedMouse(20, 60, true); win.feedMousePress(1);
+    CHECK(rg.update(win));
+    CHECK_EQ(rg.selected(), 2);
+    CHECK_STR_EQ(*rg.selectedOption(), "System");
+    // Clicking the same row again -> no change reported.
+    win.clearFrameInput(); win.feedMouse(20, 60, true); win.feedMousePress(1);
+    CHECK(!rg.update(win));
+}
+
+TEST(select_opens_and_commits) {
+    Window win{Window::Headless{}};
+    Font font; loadMono(font);
+    Select sel(0, 0, 120, 20);                  // popup below y=22, rowHeight 26
+    sel.setItems({ "C", "C++", "Python", "Rust" });
+
+    // Click field -> opens.
+    win.clearFrameInput(); win.feedMouse(40, 10, true); win.feedMousePress(1);
+    sel.update(win, font);
+    CHECK(sel.isOpen());
+
+    // Click row 1 ("C++"): row 1 spans y ~ 22+1+26 .. -> click y=60.
+    win.clearFrameInput(); win.feedMouse(40, 60, true); win.feedMousePress(1);
+    bool committed = sel.update(win, font);
+    CHECK(committed);
+    CHECK(!sel.isOpen());
+    CHECK_STR_EQ(*sel.selectedItem(), "C++");
+    CHECK_EQ(sel.selected(), 1);
 }
 
 SDLW_TEST_MAIN()
