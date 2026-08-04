@@ -11,6 +11,7 @@
 
 #include "sdlw/textbox.h"
 #include "sdlw/listbox.h"
+#include "sdlw/focus.h"
 
 #include <string>
 #include <vector>
@@ -22,7 +23,7 @@ namespace sdlw {
 class Window;
 class Font;
 
-class ComboBox {
+class ComboBox : public Focusable {
 public:
     struct Style {
         unsigned char arrowBg[3] = { 54,  54,  66 };
@@ -52,6 +53,17 @@ public:
 
     // Draw the field, arrow, and (if open) the popup list on top.
     void draw(SDL_Renderer* renderer, Font& font);
+
+    // Focusable — focus follows the text field; hit test also covers the popup.
+    void focusRect(float& x, float& y, float& w, float& h) const override { x = x_; y = y_; w = w_; h = h_; }
+    void setFocus(bool f, Window& win) override { field_.setFocus(f, win); if (!f) open_ = false; }
+    bool focused() const override { return field_.focused(); }
+    bool hitTest(float px, float py) const override {
+        if (Focusable::hitTest(px, py)) return true;
+        if (open_) { float x, y, w, h; list_.focusRect(x, y, w, h);
+                     return px >= x && px < x + w && py >= y && py < y + h; }
+        return false;
+    }
 
 private:
     void layout(Font& font);            // position field/arrow/list rects

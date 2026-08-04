@@ -233,6 +233,43 @@ TEST(focus_tab_traversal_and_activation) {
     CHECK(focus.focused() == &ok);
 }
 
+TEST(focus_includes_dropdowns_and_popup_click_keeps_focus) {
+    Window win{Window::Headless{}};
+    Font font; loadMono(font);
+
+    TextBox name(0, 0, 200, 30);
+    Select  sel(0, 40, 120, 20);              // popup below y=62
+    sel.setItems({ "C", "C++", "Python" });
+    Button  ok("OK", 0, 200, 100, 30);
+
+    FocusManager focus;
+    focus.add(&name);
+    focus.add(&sel);
+    focus.add(&ok);
+
+    // Tab twice -> the Select is focused (it's in the cycle now).
+    win.clearFrameInput(); win.feedKey(Key::Tab); focus.update(win);
+    win.clearFrameInput(); win.feedKey(Key::Tab); focus.update(win);
+    CHECK(focus.focused() == &sel);
+    CHECK(sel.focused());
+
+    // Space opens it (keyboard, while focused).
+    win.clearFrameInput(); win.feedKey(Key::Space);
+    focus.update(win);       // manager: no tab/click -> focus unchanged
+    sel.update(win, font);
+    CHECK(sel.isOpen());
+
+    // Click an item INSIDE the popup. The popup is outside the field rect, but
+    // hitTest covers it, so focus must stay on the Select (not defocus) and the
+    // click commits. Row 1 ("C++") ~ y 62+1+26 -> click y=95.
+    win.clearFrameInput(); win.feedMouse(40, 95, true); win.feedMousePress(1);
+    focus.update(win);       // must keep focus on sel (popup hit)
+    CHECK(focus.focused() == &sel);
+    bool committed = sel.update(win, font);
+    CHECK(committed);
+    CHECK_STR_EQ(*sel.selectedItem(), "C++");
+}
+
 TEST(focus_click_sync_and_defocus) {
     Window win{Window::Headless{}};
     TextBox a(0, 0, 100, 30);

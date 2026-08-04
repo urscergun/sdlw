@@ -39,6 +39,15 @@ public:
 
     virtual bool focused() const = 0;
     virtual bool acceptsFocus() const { return true; }
+
+    // Point hit test for click-to-focus. Defaults to the focus rect; composite
+    // widgets (dropdowns) override this to also cover their open popup so a
+    // click inside the popup keeps them focused.
+    virtual bool hitTest(float px, float py) const {
+        float x, y, w, h;
+        focusRect(x, y, w, h);
+        return px >= x && px < x + w && py >= y && py < y + h;
+    }
 };
 
 class FocusManager {

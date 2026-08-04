@@ -8,6 +8,7 @@
 #pragma once
 
 #include "sdlw/listbox.h"
+#include "sdlw/focus.h"
 
 #include <string>
 #include <vector>
@@ -19,7 +20,7 @@ namespace sdlw {
 class Window;
 class Font;
 
-class Select {
+class Select : public Focusable {
 public:
     struct Style {
         unsigned char bg[3]     = { 46,  46,  58 };
@@ -49,6 +50,17 @@ public:
     bool update(Window& win, Font& font);
     void draw(SDL_Renderer* renderer, Font& font);
 
+    // Focusable — hit test also covers the open popup.
+    void focusRect(float& x, float& y, float& w, float& h) const override { x = x_; y = y_; w = w_; h = h_; }
+    void setFocus(bool f, Window&) override { focused_ = f; if (!f) open_ = false; }
+    bool focused() const override { return focused_; }
+    bool hitTest(float px, float py) const override {
+        if (Focusable::hitTest(px, py)) return true;
+        if (open_) { float x, y, w, h; list_.focusRect(x, y, w, h);
+                     return px >= x && px < x + w && py >= y && py < y + h; }
+        return false;
+    }
+
 private:
     void layout(Font& font);
 
@@ -60,6 +72,7 @@ private:
     int   selected_ = -1;
     int   maxVisibleRows_ = 8;
     bool  open_ = false;
+    bool  focused_ = false;
 };
 
 } // namespace sdlw

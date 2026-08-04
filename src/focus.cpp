@@ -48,14 +48,17 @@ void FocusManager::update(Window& win) {
     // click missed every registered widget.
     if (win.mousePressed()) {
         float mx = win.mouseX(), my = win.mouseY();
-        int hit = -1;
-        for (int i = 0; i < int(items_.size()); ++i) {
-            if (!items_[i]->acceptsFocus()) continue;
-            float x, y, w, h;
-            items_[i]->focusRect(x, y, w, h);
-            if (mx >= x && mx < x + w && my >= y && my < y + h) { hit = i; break; }
+        // The focused widget gets first claim on the click — this lets an open
+        // dropdown keep focus when its popup overlaps another control.
+        Focusable* cur = focused();
+        if (!(cur && cur->acceptsFocus() && cur->hitTest(mx, my))) {
+            int hit = -1;
+            for (int i = 0; i < int(items_.size()); ++i) {
+                if (!items_[i]->acceptsFocus()) continue;
+                if (items_[i]->hitTest(mx, my)) { hit = i; break; }
+            }
+            transition(hit, win);
         }
-        transition(hit, win);
     }
 
     // Tab / Shift+Tab traversal.

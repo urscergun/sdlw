@@ -89,9 +89,11 @@ int Main(int argc, char** argv) {
     sdlw::Label status("", 380, 410);
     status.style().color[0] = 150; status.style().color[1] = 230; status.style().color[2] = 170;
 
-    // Tab order (the composites drive their own focus via the mouse).
+    // Tab order — every control participates, including the dropdowns.
     sdlw::FocusManager focus;
     focus.add(&name);
+    focus.add(&country);
+    focus.add(&lang);
     focus.add(&subscribe);
     focus.add(&plan);
     focus.add(&items);

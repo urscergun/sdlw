@@ -54,6 +54,14 @@ bool Select::update(Window& win, Font& font) {
         }
     }
 
+    // Keyboard: open when focused via Tab, using Down/Space/Enter.
+    if (focused_ && !open_ &&
+        (win.keyPressed(Key::Down) || win.keyPressed(Key::Space) || win.keyPressed(Key::Enter))) {
+        open_ = true;
+        list_.setSelected(selected_);
+        list_.select(selected_, font);
+    }
+
     if (open_) {
         list_.update(win, font);
         if (list_.itemClicked()) {
