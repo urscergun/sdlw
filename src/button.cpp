@@ -31,6 +31,11 @@ bool Button::update(Window& win) {
     }
     pressed_ = down && armed_ && hovered_;
     wasDown_ = down;
+
+    // Keyboard activation when focused (Enter or Space).
+    if (focused_ && (win.keyPressed(Key::Enter) || win.keyPressed(Key::Space)))
+        clicked = true;
+
     return clicked;
 }
 

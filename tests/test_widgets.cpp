@@ -11,6 +11,7 @@
 #include "sdlw/checkbox.h"
 #include "sdlw/radiogroup.h"
 #include "sdlw/select.h"
+#include "sdlw/focus.h"
 
 #include <string>
 
@@ -174,6 +175,82 @@ TEST(select_opens_and_commits) {
     CHECK(!sel.isOpen());
     CHECK_STR_EQ(*sel.selectedItem(), "C++");
     CHECK_EQ(sel.selected(), 1);
+}
+
+TEST(focus_tab_traversal_and_activation) {
+    Window win{Window::Headless{}};
+    Font font; loadMono(font);
+
+    TextBox  name(0, 0, 200, 30);
+    Checkbox agree("Agree", 0, 40, 200, 24);
+    Button   ok("OK", 0, 80, 100, 30);
+
+    FocusManager focus;
+    focus.add(&name);
+    focus.add(&agree);
+    focus.add(&ok);
+
+    // Nothing focused initially.
+    CHECK(focus.focused() == nullptr);
+
+    // Tab -> first (name).
+    win.clearFrameInput(); win.feedKey(Key::Tab);
+    focus.update(win);
+    CHECK(focus.focused() == &name);
+    CHECK(name.focused());
+
+    // Typing now goes to the focused text box (no click needed).
+    win.clearFrameInput(); win.feedText("hi");
+    name.update(win, font);
+    CHECK_STR_EQ(name.text(), "hi");
+
+    // Tab -> checkbox; Space toggles it.
+    win.clearFrameInput(); win.feedKey(Key::Tab);
+    focus.update(win);
+    CHECK(focus.focused() == &agree);
+    CHECK(!name.focused());
+    win.clearFrameInput(); win.feedKey(Key::Space);
+    focus.update(win);           // manager consumes nothing here; widget acts
+    CHECK(agree.update(win));
+    CHECK(agree.checked());
+
+    // Tab -> button; Enter activates it.
+    win.clearFrameInput(); win.feedKey(Key::Tab);
+    focus.update(win);
+    CHECK(focus.focused() == &ok);
+    win.clearFrameInput(); win.feedKey(Key::Enter);
+    focus.update(win);
+    CHECK(ok.update(win));
+
+    // Tab wraps back to the first control.
+    win.clearFrameInput(); win.feedKey(Key::Tab);
+    focus.update(win);
+    CHECK(focus.focused() == &name);
+
+    // Shift+Tab goes backwards (to the last control).
+    win.clearFrameInput(); win.feedKey(Key::Tab); win.feedMods(true, false);
+    focus.update(win);
+    CHECK(focus.focused() == &ok);
+}
+
+TEST(focus_click_sync_and_defocus) {
+    Window win{Window::Headless{}};
+    TextBox a(0, 0, 100, 30);
+    TextBox b(0, 40, 100, 30);
+    FocusManager focus;
+    focus.add(&a);
+    focus.add(&b);
+
+    // Click inside b -> focus follows the click.
+    win.clearFrameInput(); win.feedMouse(50, 55, true); win.feedMousePress(1);
+    focus.update(win);
+    CHECK(focus.focused() == &b);
+
+    // Click empty space -> focus cleared.
+    win.clearFrameInput(); win.feedMouse(500, 500, true); win.feedMousePress(1);
+    focus.update(win);
+    CHECK(focus.focused() == nullptr);
+    CHECK(!b.focused());
 }
 
 SDLW_TEST_MAIN()

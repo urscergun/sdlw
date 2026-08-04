@@ -5,6 +5,8 @@
 // that both land inside the button. Uses only SDL.
 #pragma once
 
+#include "sdlw/focus.h"
+
 #include <string>
 
 struct SDL_Renderer;
@@ -14,7 +16,7 @@ namespace sdlw {
 class Font;
 class Window;
 
-class Button {
+class Button : public Focusable {
 public:
     // Per-state RGB colors. Tweak via style()/setStyle().
     struct Style {
@@ -44,6 +46,11 @@ public:
     bool hovered() const { return hovered_; }
     bool pressed() const { return pressed_; }
 
+    // Focusable
+    void focusRect(float& x, float& y, float& w, float& h) const override { x = x_; y = y_; w = w_; h = h_; }
+    void setFocus(bool f, Window&) override { focused_ = f; }
+    bool focused() const override { return focused_; }
+
 private:
     std::string label_;
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
@@ -52,6 +59,7 @@ private:
     bool pressed_ = false;
     bool armed_   = false; // press started inside this button
     bool wasDown_ = false; // left button state last frame
+    bool focused_ = false;
 };
 
 } // namespace sdlw

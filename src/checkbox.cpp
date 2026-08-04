@@ -22,6 +22,11 @@ bool Checkbox::update(Window& win) {
         checked_ = !checked_;
         return true;
     }
+    // Keyboard toggle when focused (Space or Enter).
+    if (focused_ && (win.keyPressed(Key::Space) || win.keyPressed(Key::Enter))) {
+        checked_ = !checked_;
+        return true;
+    }
     return false;
 }
 

@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <cmath>
 #include <utility>
 
@@ -46,6 +47,13 @@ bool RadioGroup::update(Window& win) {
     if (win.mousePressed() && hover_ >= 0 && hover_ != selected_) {
         selected_ = hover_;
         return true;
+    }
+    // Keyboard navigation when focused.
+    if (focused_ && count() > 0) {
+        int prev = selected_;
+        if (win.keyPressed(Key::Down)) selected_ = (selected_ < 0) ? 0 : std::min(selected_ + 1, count() - 1);
+        if (win.keyPressed(Key::Up))   selected_ = (selected_ <= 0) ? 0 : selected_ - 1;
+        if (selected_ != prev) return true;
     }
     return false;
 }

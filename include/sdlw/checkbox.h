@@ -4,6 +4,8 @@
 // input from the Window; returns true on the frame the state toggles.
 #pragma once
 
+#include "sdlw/focus.h"
+
 #include <string>
 
 struct SDL_Renderer;
@@ -13,7 +15,7 @@ namespace sdlw {
 class Window;
 class Font;
 
-class Checkbox {
+class Checkbox : public Focusable {
 public:
     struct Style {
         unsigned char box[3]      = { 44,  44,  54 };
@@ -36,11 +38,17 @@ public:
     bool update(Window& win);                 // true on the frame it toggles
     void draw(SDL_Renderer* renderer, Font& font);
 
+    // Focusable
+    void focusRect(float& x, float& y, float& w, float& h) const override { x = x_; y = y_; w = w_; h = h_; }
+    void setFocus(bool f, Window&) override { focused_ = f; }
+    bool focused() const override { return focused_; }
+
 private:
     std::string label_;
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
     bool  checked_ = false;
     bool  hovered_ = false;
+    bool  focused_ = false;
     Style style_;
 };
 

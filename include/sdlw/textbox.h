@@ -6,6 +6,8 @@
 // Uses only SDL. Feed it input each frame via update(Window&).
 #pragma once
 
+#include "sdlw/focus.h"
+
 #include <string>
 
 struct SDL_Renderer;
@@ -15,7 +17,7 @@ namespace sdlw {
 class Window;
 class Font;
 
-class TextBox {
+class TextBox : public Focusable {
 public:
     struct Style {
         unsigned char bg[3]            = { 38,  38,  46 };
@@ -38,7 +40,7 @@ public:
     Style& style();
 
     const std::string& text() const { return text_; }
-    bool focused() const { return focused_; }
+    bool focused() const override { return focused_; }
     bool hasSelection() const { return sel_ != caret_; }
     std::string selectedText() const;
 
@@ -49,6 +51,10 @@ public:
 
     // Draw the field, selection highlight, text, and caret.
     void draw(SDL_Renderer* renderer, Font& font);
+
+    // Focusable
+    void focusRect(float& x, float& y, float& w, float& h) const override { x = x_; y = y_; w = w_; h = h_; }
+    void setFocus(bool f, Window& win) override { setFocused(f, win); }
 
 private:
     std::string text_;

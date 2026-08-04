@@ -4,6 +4,8 @@
 // and clickable. update() returns true on the frame the selection changes.
 #pragma once
 
+#include "sdlw/focus.h"
+
 #include <string>
 #include <vector>
 
@@ -14,7 +16,7 @@ namespace sdlw {
 class Window;
 class Font;
 
-class RadioGroup {
+class RadioGroup : public Focusable {
 public:
     struct Style {
         unsigned char ring[3]     = { 130, 130, 150 };
@@ -39,11 +41,19 @@ public:
     bool update(Window& win);                 // true on the frame selection changes
     void draw(SDL_Renderer* renderer, Font& font);
 
+    // Focusable — the ring/hit rect spans all rows.
+    void focusRect(float& x, float& y, float& w, float& h) const override {
+        x = x_; y = y_; w = w_; h = rowH_ * count();
+    }
+    void setFocus(bool f, Window&) override { focused_ = f; }
+    bool focused() const override { return focused_; }
+
 private:
     std::vector<std::string> options_;
     float x_ = 0, y_ = 0, w_ = 0, rowH_ = 26;
     int   selected_ = -1;
     int   hover_ = -1;
+    bool  focused_ = false;
     Style style_;
 };
 

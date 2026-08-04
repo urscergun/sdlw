@@ -6,6 +6,8 @@
 // update(Window&, Font&).
 #pragma once
 
+#include "sdlw/focus.h"
+
 #include <string>
 #include <vector>
 
@@ -16,7 +18,7 @@ namespace sdlw {
 class Window;
 class Font;
 
-class ListBox {
+class ListBox : public Focusable {
 public:
     struct Style {
         unsigned char bg[3]           = { 34,  34,  42 };
@@ -56,6 +58,11 @@ public:
 
     // Draw the list, selection/hover highlights, and scrollbar thumb.
     void draw(SDL_Renderer* renderer, Font& font);
+
+    // Focusable
+    void focusRect(float& x, float& y, float& w, float& h) const override { x = x_; y = y_; w = w_; h = h_; }
+    void setFocus(bool f, Window&) override { focused_ = f; }
+    bool focused() const override { return focused_; }
 
 private:
     float maxScroll(Font& font) const;      // clamp bound for scroll_
