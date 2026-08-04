@@ -43,6 +43,12 @@ struct Window::Impl {
     bool          mousePressed = false;             // left button down this frame
     int           mouseClicks = 0;                  // click count of that press
     float         mouseWheel = 0;                   // vertical wheel delta this frame
+
+    // Sampled input state (level), refreshed by pumpEvents() or feed* calls.
+    float         mouseX = 0, mouseY = 0;
+    bool          mouseDown = false;
+    bool          modShift = false, modCtrl = false;
+    std::string   clipboard;                        // in-memory clipboard (headless)
 };
 
 namespace {
@@ -106,6 +112,10 @@ Window::Window(const WindowConfig& config) : impl_(new Impl) {
                        config.vsync ? 1 : SDL_RENDERER_VSYNC_DISABLED);
 }
 
+// Headless: no SDL window/renderer/init. Used to drive widget logic in tests;
+// input is supplied via the feed* methods instead of pumpEvents().
+Window::Window(Headless) : impl_(new Impl) {}
+
 Window::~Window() {
     if (impl_->renderer) SDL_DestroyRenderer(impl_->renderer);
     if (impl_->window)   SDL_DestroyWindow(impl_->window);
@@ -155,6 +165,17 @@ bool Window::pumpEvents() {
                 break;
         }
     }
+
+    // Sample level input state once per frame.
+    float mxx = 0, myy = 0;
+    SDL_MouseButtonFlags mb = SDL_GetMouseState(&mxx, &myy);
+    impl_->mouseX = mxx;
+    impl_->mouseY = myy;
+    impl_->mouseDown = (mb & SDL_BUTTON_LMASK) != 0;
+    SDL_Keymod mod = SDL_GetModState();
+    impl_->modShift = (mod & SDL_KMOD_SHIFT) != 0;
+    impl_->modCtrl  = (mod & SDL_KMOD_CTRL) != 0;
+
     return running;
 }
 
@@ -176,6 +197,46 @@ bool Window::keyPressed(Key key) const {
 bool  Window::mousePressed() const { return impl_->mousePressed; }
 int   Window::mouseClicks() const { return impl_->mouseClicks; }
 float Window::mouseWheel() const { return impl_->mouseWheel; }
+float Window::mouseX() const { return impl_->mouseX; }
+float Window::mouseY() const { return impl_->mouseY; }
+bool  Window::mouseDown() const { return impl_->mouseDown; }
+bool  Window::modShift() const { return impl_->modShift; }
+bool  Window::modCtrl() const { return impl_->modCtrl; }
+
+std::string Window::clipboardText() const {
+    if (impl_->window) {
+        char* c = SDL_GetClipboardText();
+        std::string s = c ? c : "";
+        if (c) SDL_free(c);
+        return s;
+    }
+    return impl_->clipboard;
+}
+
+void Window::setClipboardText(const std::string& text) {
+    impl_->clipboard = text;
+    if (impl_->window) SDL_SetClipboardText(text.c_str());
+}
+
+// --- Headless input injection (tests) --------------------------------------
+void Window::clearFrameInput() {
+    impl_->frameText.clear();
+    for (bool& k : impl_->keys) k = false;
+    impl_->mousePressed = false;
+    impl_->mouseClicks = 0;
+    impl_->mouseWheel = 0;
+}
+void Window::feedMouse(float x, float y, bool down) {
+    impl_->mouseX = x; impl_->mouseY = y; impl_->mouseDown = down;
+}
+void Window::feedMods(bool shift, bool ctrl) { impl_->modShift = shift; impl_->modCtrl = ctrl; }
+void Window::feedMousePress(int clicks) { impl_->mousePressed = true; impl_->mouseClicks = clicks; }
+void Window::feedWheel(float delta) { impl_->mouseWheel += delta; }
+void Window::feedText(const std::string& utf8) { impl_->frameText += utf8; }
+void Window::feedKey(Key key) {
+    int idx = int(key);
+    if (idx >= 0 && idx < int(Key::Count)) impl_->keys[idx] = true;
+}
 
 void Window::clear(unsigned char r, unsigned char g, unsigned char b) {
     if (!impl_->renderer) return;

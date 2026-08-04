@@ -163,6 +163,13 @@ bool Font::loadFromMemory(SDL_Renderer* renderer,
     return impl_->buildAtlas(surf);
 }
 
+bool Font::loadMetrics(const unsigned char* fnt, unsigned int fntLen) {
+    impl_->renderer = nullptr;
+    std::string text(reinterpret_cast<const char*>(fnt), fntLen);
+    impl_->parseDescriptor(text);
+    return impl_->lineHeight > 0 && !impl_->glyphs.empty();
+}
+
 bool Font::ok() const { return impl_->texture != nullptr; }
 
 void Font::draw(const std::string& utf8, float x, float y,

@@ -12,6 +12,7 @@ struct SDL_Renderer;
 namespace sdlw {
 
 class Font;
+class Window;
 
 class Button {
 public:
@@ -32,10 +33,10 @@ public:
     void setStyle(const Style& style);
     Style& style();
 
-    // Poll the mouse and update hover/press state. Returns true once on the
-    // frame the button is clicked (press + release both inside). Call once per
-    // frame, after the window has pumped events.
-    bool update();
+    // Update hover/press state from the window's input. Returns true once on
+    // the frame the button is clicked (press + release both inside). Call once
+    // per frame, after the window has pumped events.
+    bool update(Window& win);
 
     // Draw the button. `font` supplies the label glyphs.
     void draw(SDL_Renderer* renderer, Font& font);

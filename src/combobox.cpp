@@ -71,8 +71,7 @@ bool ComboBox::update(Window& win, Font& font) {
     layout(font);
     bool committed = false;
 
-    float mx = 0, my = 0;
-    SDL_GetMouseState(&mx, &my);
+    float mx = win.mouseX(), my = win.mouseY();
     bool overArrow = (mx >= x_ + w_ - arrowW_ && mx < x_ + w_ && my >= y_ && my < y_ + h_);
     bool overField = (mx >= x_ && mx < x_ + w_ - arrowW_ && my >= y_ && my < y_ + h_);
 

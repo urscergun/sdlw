@@ -1,4 +1,5 @@
 #include "sdlw/button.h"
+#include "sdlw/window.h"
 #include "sdlw/font.h"
 
 #include <SDL3/SDL.h>
@@ -15,10 +16,9 @@ void Button::setLabel(std::string label) { label_ = std::move(label); }
 void Button::setStyle(const Style& style) { style_ = style; }
 Button::Style& Button::style() { return style_; }
 
-bool Button::update() {
-    float mx = 0, my = 0;
-    SDL_MouseButtonFlags buttons = SDL_GetMouseState(&mx, &my);
-    bool down = (buttons & SDL_BUTTON_LMASK) != 0;
+bool Button::update(Window& win) {
+    float mx = win.mouseX(), my = win.mouseY();
+    bool down = win.mouseDown();
 
     hovered_ = (mx >= x_ && mx < x_ + w_ && my >= y_ && my < y_ + h_);
 

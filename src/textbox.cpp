@@ -62,13 +62,12 @@ void TextBox::setFocused(bool focused, Window& win) {
 
 void TextBox::update(Window& win, Font& font) {
     const float pad = 6.0f;
-    SDL_Keymod mod = SDL_GetModState();
-    bool shift = (mod & SDL_KMOD_SHIFT) != 0;
-    bool ctrl  = (mod & SDL_KMOD_CTRL) != 0;
+    bool shift = win.modShift();
+    bool ctrl  = win.modCtrl();
 
     // --- Mouse: focus, click-to-place caret, double-click word, drag-select -
-    float mx = 0, my = 0;
-    bool down = (SDL_GetMouseState(&mx, &my) & SDL_BUTTON_LMASK) != 0;
+    float mx = win.mouseX(), my = win.mouseY();
+    bool down = win.mouseDown();
     bool inside = (mx >= x_ && mx < x_ + w_ && my >= y_ && my < y_ + h_);
     float localX = mx - (x_ + pad) + scroll_;
 
@@ -107,16 +106,15 @@ void TextBox::update(Window& win, Font& font) {
 
     // --- Clipboard shortcuts ----------------------------------------------
     if (win.keyPressed(Key::Copy) && hasSelection()) {
-        SDL_SetClipboardText(selectedText().c_str());
+        win.setClipboardText(selectedText());
     }
     if (win.keyPressed(Key::Cut) && hasSelection()) {
-        SDL_SetClipboardText(selectedText().c_str());
+        win.setClipboardText(selectedText());
         deleteSelection();
     }
     if (win.keyPressed(Key::Paste)) {
-        if (char* clip = SDL_GetClipboardText()) {
-            std::string in(clip);
-            SDL_free(clip);
+        std::string in = win.clipboardText();
+        if (!in.empty()) {
             in.erase(std::remove(in.begin(), in.end(), '\n'), in.end()); // single line
             in.erase(std::remove(in.begin(), in.end(), '\r'), in.end());
             if (hasSelection()) deleteSelection();

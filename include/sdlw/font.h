@@ -32,6 +32,10 @@ public:
                         const unsigned char* fnt, unsigned int fntLen,
                         const unsigned char* bmp, unsigned int bmpLen);
 
+    // Parse only the descriptor metrics (no atlas texture, no renderer needed).
+    // measure()/lineHeight()/base() work; draw() is a no-op. For tests/layout.
+    bool loadMetrics(const unsigned char* fnt, unsigned int fntLen);
+
     bool ok() const;
 
     // Draw UTF-8 text with the top-left of the text block at (x, y).

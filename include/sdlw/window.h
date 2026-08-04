@@ -90,6 +90,35 @@ public:
     // pumpEvents(). Positive = scrolled away from the user (up).
     float mouseWheel() const;
 
+    // Mouse position (window pixels) and left-button level state, sampled at
+    // the last pumpEvents(). Widgets read these instead of calling SDL directly.
+    float mouseX() const;
+    float mouseY() const;
+    bool  mouseDown() const;
+
+    // Keyboard modifier state at the last pumpEvents().
+    bool  modShift() const;
+    bool  modCtrl() const;
+
+    // OS clipboard access (in-memory when headless).
+    std::string clipboardText() const;
+    void        setClipboardText(const std::string& text);
+
+    // --- Headless / test injection -----------------------------------------
+    // Construct a Window with no SDL window/renderer, for driving widget
+    // update() logic in tests. Feed input with the feed*/clearFrameInput calls
+    // below instead of pumpEvents().
+    struct Headless {};
+    explicit Window(Headless);
+
+    void clearFrameInput();                       // reset per-frame input (like pumpEvents start)
+    void feedMouse(float x, float y, bool down);  // position + left-button level
+    void feedMods(bool shift, bool ctrl);
+    void feedMousePress(int clicks);              // a press this frame with click count
+    void feedWheel(float delta);
+    void feedText(const std::string& utf8);       // append typed text this frame
+    void feedKey(Key key);                        // mark an editing/command key pressed
+
     // Low-level handles for in-house rendering code.
     SDL_Window*   handle() const;
     SDL_Renderer* renderer() const;

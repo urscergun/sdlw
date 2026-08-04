@@ -76,8 +76,8 @@ bool ListBox::update(Window& win, Font& font) {
     int prevSelected = selected_;
     itemClicked_ = false;
 
-    float mx = 0, my = 0;
-    bool down = (SDL_GetMouseState(&mx, &my) & SDL_BUTTON_LMASK) != 0;
+    float mx = win.mouseX(), my = win.mouseY();
+    bool down = win.mouseDown();
     bool inside = (mx >= x_ && mx < x_ + w_ && my >= y_ && my < y_ + h_);
 
     // Scrollbar geometry + whether the cursor is over its column.
