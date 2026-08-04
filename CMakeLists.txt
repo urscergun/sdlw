@@ -88,9 +88,24 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 endif()
 if(SDLW_BUILD_TESTS)
     enable_testing()
+
+    # Pure-logic tests: header-only, no SDL headers needed.
     foreach(t test_text test_bmfont)
         add_executable(${t} tests/${t}.cpp)
         target_include_directories(${t} PRIVATE src tests)
         add_test(NAME ${t} COMMAND ${t})
     endforeach()
+
+    # Headless widget tests: compile the widget sources against SDL *headers*
+    # plus a no-op SDL link stub, so they run without a display or the SDL
+    # library. Widget update() logic never calls SDL at runtime (input comes
+    # from the headless Window), so the stubs are only there to satisfy linking.
+    add_executable(test_widgets
+        tests/test_widgets.cpp
+        tests/sdl_stub.cpp
+        src/window.cpp src/font.cpp
+        src/button.cpp src/textbox.cpp src/listbox.cpp src/combobox.cpp)
+    target_include_directories(test_widgets PRIVATE
+        include src tests ${CMAKE_CURRENT_SOURCE_DIR}/vendor/SDL/include)
+    add_test(NAME test_widgets COMMAND test_widgets)
 endif()
