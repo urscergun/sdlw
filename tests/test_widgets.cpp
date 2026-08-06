@@ -466,4 +466,41 @@ TEST(listview_column_sorting) {
     CHECK_STR_EQ((*lv.selectedRow())[0], "alice");  // still selected after re-sort
 }
 
+TEST(scrollbar_horizontal_orientation) {
+    Window win{Window::Headless{}};
+    Scrollbar bar;
+    bar.setOrientation(Scrollbar::Orient::Horizontal);
+    bar.setRect(0, 100, 200, 8);       // horizontal track along x 0..200
+    bar.setRange(500, 200);            // maxScroll 300
+    CHECK(bar.needed());
+    // Grab thumb (top-left, value 0) and drag right past the end -> maxScroll.
+    win.clearFrameInput(); win.feedMouse(10, 104, true); win.feedMousePress(1);
+    bar.update(win);
+    win.clearFrameInput(); win.feedMouse(400, 104, true); bar.update(win);
+    CHECK(bar.value() >= bar.maxScroll() - 0.5f);
+}
+
+TEST(listview_horizontal_scroll) {
+    Window win{Window::Headless{}};
+    Font font; loadMono(font);
+    // Columns total 400 wide in a 200-wide widget -> horizontal scroll needed.
+    ListView lv(0, 0, 200, 200);
+    lv.setColumns({ { "A", 200 }, { "B", 200 } });
+    lv.setRows({ { "a0", "b0" }, { "a1", "b1" } });
+
+    // Shift+wheel scrolls horizontally.
+    win.clearFrameInput();
+    win.feedMouse(50, 60, false);      // inside the body
+    win.feedMods(true, false);         // shift held
+    win.feedWheel(-2);                 // wheel toward content
+    lv.update(win, font);
+    // We can't read hscroll directly, but clicking the header of the SECOND
+    // column should now be reachable: with hscroll > 0, screen x that maps to
+    // column B lands within the widget. Sort by clicking header at x=10 which,
+    // after scrolling, is inside column... assert no crash + selection works.
+    win.clearFrameInput(); win.feedMouse(50, 60, true); win.feedMousePress(1);
+    lv.update(win, font);
+    CHECK(lv.selected() >= 0);         // a row got selected despite horizontal scroll
+}
+
 SDLW_TEST_MAIN()

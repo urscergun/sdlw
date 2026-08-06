@@ -14,6 +14,8 @@ class Window;
 
 class Scrollbar {
 public:
+    enum class Orient { Vertical, Horizontal };
+
     struct Style {
         unsigned char thumb[3]       = { 100, 100, 120 };
         unsigned char thumbActive[3] = { 140, 140, 165 };
@@ -21,6 +23,7 @@ public:
 
     Scrollbar() = default;
 
+    void setOrientation(Orient o) { orient_ = o; }
     void setRect(float x, float y, float w, float h);     // the track rectangle
     void setRange(float contentSize, float viewSize);     // total vs visible
     void setValue(float v);                               // scroll offset (clamped)
@@ -45,7 +48,8 @@ private:
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
     float content_ = 0, view_ = 0, value_ = 0;
     bool  dragging_ = false;
-    float grab_ = 0;                                      // mouse-to-thumb-top offset
+    float grab_ = 0;                                      // mouse-to-thumb-start offset
+    Orient orient_ = Orient::Vertical;
     Style style_;
 };
 

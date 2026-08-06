@@ -100,10 +100,12 @@ int Main(int argc, char** argv) {
     sdlw::Label    tableL("People (ListView)", 680, 60);
     sdlw::ListView table(680, 80, 340, 400);
     // Click a column header to sort (unordered -> ascending -> descending).
-    table.setColumns({ { "Name", 140, sdlw::ListView::Align::Left },
-                       { "Age", 50, sdlw::ListView::Align::Right, sdlw::ListView::SortType::Numeric },
-                       { "City", 90, sdlw::ListView::Align::Left },
-                       { "Role", 60, sdlw::ListView::Align::Left } });
+    // Total column width (490) exceeds the widget (340), so a horizontal
+    // scrollbar appears; Shift+wheel or the bottom bar scroll horizontally.
+    table.setColumns({ { "Name", 180, sdlw::ListView::Align::Left },
+                       { "Age", 70, sdlw::ListView::Align::Right, sdlw::ListView::SortType::Numeric },
+                       { "City", 130, sdlw::ListView::Align::Left },
+                       { "Role", 110, sdlw::ListView::Align::Left } });
     table.setRows({
         { "Ada Lovelace", "36", "London", "Math" },
         { "Alan Turing", "41", "Bletchley", "Crypto" },

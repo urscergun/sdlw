@@ -101,30 +101,61 @@ int ListView::columnAtX(float mx) const {
     return -1;
 }
 
-float ListView::maxScroll(Font& font) const {
-    float bodyH = h_ - headerHeight(font) - 2;
-    return std::max(0.0f, float(rowCount() * rowHeight(font)) - bodyH);
+float ListView::contentWidth() const {
+    float sum = 0;
+    for (const Column& c : columns_) sum += c.width;
+    return sum;
 }
 
-void ListView::syncBar(Font& font) {
+float ListView::maxScroll(Font& font) const {
+    return std::max(0.0f, float(rowCount() * rowHeight(font)) - bodyH_);
+}
+
+// Decide which scrollbars are needed (two-pass, since each steals space from
+// the other) and size both bars. Records the content viewport in viewW_/bodyH_.
+void ListView::layoutBars(Font& font) {
+    const float barW = 8.0f;
     float hH = headerHeight(font);
+    float rowsH = float(rowCount() * rowHeight(font));
+    float contentW = contentWidth();
+    float fullBodyH = h_ - hH - 2;
+
+    bool vN = rowsH > fullBodyH;
+    bool hN = contentW > (w_ - 2 - (vN ? barW : 0));
+    float bodyH = fullBodyH - (hN ? barW : 0);
+    vN = rowsH > bodyH;
+    float viewW = w_ - 2 - (vN ? barW : 0);
+    hN = contentW > viewW;
+    bodyH = fullBodyH - (hN ? barW : 0);
+
+    viewW_ = viewW;
+    bodyH_ = bodyH;
     float bodyTop = y_ + hH + 1;
-    float bodyH = h_ - hH - 2;
-    bar_.setRect(x_ + w_ - 8.0f, bodyTop, 7.0f, bodyH);
-    bar_.setRange(float(rowCount() * rowHeight(font)), bodyH);
-    bar_.style().thumb[0] = style_.scrollThumb[0];
-    bar_.style().thumb[1] = style_.scrollThumb[1];
-    bar_.style().thumb[2] = style_.scrollThumb[2];
+
+    auto tint = [&](Scrollbar& b) {
+        b.style().thumb[0] = style_.scrollThumb[0];
+        b.style().thumb[1] = style_.scrollThumb[1];
+        b.style().thumb[2] = style_.scrollThumb[2];
+    };
+    bar_.setOrientation(Scrollbar::Orient::Vertical);
+    bar_.setRect(x_ + w_ - barW, bodyTop, barW - 1, bodyH);
+    bar_.setRange(rowsH, bodyH);
+    tint(bar_);
     bar_.setValue(scroll_);
+
+    hbar_.setOrientation(Scrollbar::Orient::Horizontal);
+    hbar_.setRect(x_ + 1, y_ + h_ - barW, viewW, barW - 1);
+    hbar_.setRange(contentW, viewW);
+    tint(hbar_);
+    hbar_.setValue(hscroll_);
 }
 
 void ListView::scrollToSelected(Font& font) {
     if (selected_ < 0) return;
     int rh = rowHeight(font);
-    float bodyH = h_ - headerHeight(font) - 2;
     float top = float(selected_ * rh), bottom = top + rh;
-    if (top < scroll_)                 scroll_ = top;
-    else if (bottom > scroll_ + bodyH) scroll_ = bottom - bodyH;
+    if (top < scroll_)                  scroll_ = top;
+    else if (bottom > scroll_ + bodyH_) scroll_ = bottom - bodyH_;
 }
 
 bool ListView::update(Window& win, Font& font) {
@@ -132,17 +163,23 @@ bool ListView::update(Window& win, Font& font) {
     int rh = rowHeight(font);
     float hH = headerHeight(font);
     float bodyTop = y_ + hH + 1;
-    float bodyH = h_ - hH - 2;
     int prev = selected_;
 
+    layoutBars(font);   // sets viewW_/bodyH_ and both bar geometries
+
     float mx = win.mouseX(), my = win.mouseY();
-    bool inBody = (mx >= x_ && mx < x_ + w_ && my >= bodyTop && my < bodyTop + bodyH);
+    bool inBody = (mx >= x_ && mx < x_ + viewW_ && my >= bodyTop && my < bodyTop + bodyH_);
     bool inWidget = (mx >= x_ && mx < x_ + w_ && my >= y_ && my < y_ + h_);
 
-    if (inBody && win.mouseWheel() != 0) scroll_ -= win.mouseWheel() * rh * 3.0f;
+    // Wheel: vertical, or horizontal when Shift is held.
+    if (inBody && win.mouseWheel() != 0) {
+        if (win.modShift()) hscroll_ -= win.mouseWheel() * 40.0f;
+        else                scroll_  -= win.mouseWheel() * rh * 3.0f;
+        bar_.setValue(scroll_);
+        hbar_.setValue(hscroll_);
+    }
 
-    syncBar(font);
-    bool overBar = bar_.needed() && bar_.hit(mx, my);
+    bool overBar = (bar_.needed() && bar_.hit(mx, my)) || (hbar_.needed() && hbar_.hit(mx, my));
 
     hover_ = -1;
     if (inBody && !overBar) {
@@ -150,12 +187,12 @@ bool ListView::update(Window& win, Font& font) {
         if (row >= 0 && row < rowCount()) hover_ = row;
     }
 
-    bool inHeader = showHeader_ && (mx >= x_ && mx < x_ + w_ && my >= y_ && my < y_ + hH);
+    bool inHeader = showHeader_ && (mx >= x_ && mx < x_ + viewW_ && my >= y_ && my < y_ + hH);
 
     if (win.mousePressed()) {
         focused_ = inWidget;
         if (inHeader) {                          // click a header -> cycle its sort
-            int c = columnAtX(mx);
+            int c = columnAtX(mx + hscroll_);    // map screen x to content column
             if (c >= 0 && columns_[c].sortable) {
                 if (sortCol_ == c) {
                     if (dir_ == SortDir::Ascending)  dir_ = SortDir::Descending;
@@ -171,15 +208,15 @@ bool ListView::update(Window& win, Font& font) {
         }
     }
 
-    bar_.update(win);
-    scroll_ = bar_.value();
+    bar_.update(win);  scroll_  = bar_.value();
+    hbar_.update(win); hscroll_ = hbar_.value();
 
     if (focused_ && rowCount() > 0) {
         if (win.keyPressed(Key::Up))   selected_ = (selected_ <= 0) ? 0 : selected_ - 1;
         if (win.keyPressed(Key::Down)) selected_ = (selected_ < 0) ? 0 : std::min(selected_ + 1, rowCount() - 1);
         if (win.keyPressed(Key::Home)) selected_ = 0;
         if (win.keyPressed(Key::End))  selected_ = rowCount() - 1;
-        int page = std::max(1, int(bodyH / rh));
+        int page = std::max(1, int(bodyH_ / rh));
         if (win.keyPressed(Key::PageUp))   selected_ = std::max(0, (selected_ < 0 ? 0 : selected_) - page);
         if (win.keyPressed(Key::PageDown)) selected_ = std::min(rowCount() - 1, (selected_ < 0 ? 0 : selected_) + page);
         if (win.keyPressed(Key::Enter) && selected_ >= 0) activated_ = true;
@@ -191,21 +228,30 @@ bool ListView::update(Window& win, Font& font) {
 }
 
 void ListView::draw(SDL_Renderer* renderer, Font& font) {
+    layoutBars(font);   // sets viewW_/bodyH_ and bar geometries
+
     const int rh = rowHeight(font);
     const int lineH = font.lineHeight();
     const float hH = headerHeight(font);
     const float bodyTop = y_ + hH + 1;
-    const float bodyH = h_ - hH - 2;
     const float cellPad = 8.0f;
+    const float viewLeft = x_ + 1;
+    const float viewRight = x_ + 1 + viewW_;   // right edge of the content area (before vbar)
 
     SDL_FRect rect{ x_, y_, w_, h_ };
     SDL_SetRenderDrawColor(renderer, style_.bg[0], style_.bg[1], style_.bg[2], 255);
     SDL_RenderFillRect(renderer, &rect);
 
+    // Draws a cell; colX is already shifted by -hscroll_. Clips to the column
+    // intersected with the content viewport so nothing spills under the bars.
     auto drawCell = [&](const std::string& text, const Column& col, float colX,
                         float rowY, float rowH, const unsigned char* color) {
-        SDL_Rect clip{ int(colX), int(std::max(rowY, y_)), int(col.width),
-                       int(std::min(rowY + rowH, y_ + h_) - std::max(rowY, y_)) };
+        float cl = std::max(colX, viewLeft);
+        float cr = std::min(colX + col.width, viewRight);
+        float ct = std::max(rowY, y_);
+        float cb = std::min(rowY + rowH, y_ + h_);
+        if (cr <= cl || cb <= ct) return;
+        SDL_Rect clip{ int(cl), int(ct), int(cr - cl), int(cb - ct) };
         SDL_SetRenderClipRect(renderer, &clip);
         int tw = 0, th = 0;
         font.measure(text, &tw, &th);
@@ -213,34 +259,34 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
         font.draw(text, tx, rowY + (rowH - lineH) * 0.5f, color[0], color[1], color[2]);
     };
 
-    // Header (fixed).
+    // Header (fixed vertically; scrolls horizontally with the body).
     if (showHeader_) {
         SDL_FRect hdr{ x_, y_, w_, hH };
         SDL_SetRenderDrawColor(renderer, style_.headerBg[0], style_.headerBg[1], style_.headerBg[2], 255);
         SDL_RenderFillRect(renderer, &hdr);
-        // Reserve room on the right of sortable headers for the sort arrow, so
-        // the title never runs underneath it.
-        const float kSortIconW = 16.0f;
+        const float kSortIconW = 16.0f;   // reserve room for the sort arrow
         for (int c = 0; c < int(columns_.size()); ++c) {
             Column hc = columns_[c];
             if (hc.sortable) hc.width = std::max(0.0f, hc.width - kSortIconW);
-            drawCell(columns_[c].title, hc, columnX(c), y_, hH, style_.headerText);
+            drawCell(columns_[c].title, hc, columnX(c) - hscroll_, y_, hH, style_.headerText);
         }
         SDL_SetRenderClipRect(renderer, nullptr);
 
         // Sort arrow on the active column (up = ascending, down = descending).
         if (sortCol_ >= 0 && sortCol_ < int(columns_.size()) && dir_ != SortDir::None) {
-            float ax = columnX(sortCol_) + columns_[sortCol_].width - 12;
+            float ax = columnX(sortCol_) + columns_[sortCol_].width - 12 - hscroll_;
             float ay = y_ + hH * 0.5f;
-            SDL_SetRenderDrawColor(renderer, style_.headerText[0], style_.headerText[1], style_.headerText[2], 255);
-            if (dir_ == SortDir::Ascending) {
-                SDL_RenderLine(renderer, ax - 4, ay + 3, ax + 4, ay + 3);
-                SDL_RenderLine(renderer, ax - 4, ay + 3, ax, ay - 3);
-                SDL_RenderLine(renderer, ax + 4, ay + 3, ax, ay - 3);
-            } else {
-                SDL_RenderLine(renderer, ax - 4, ay - 3, ax + 4, ay - 3);
-                SDL_RenderLine(renderer, ax - 4, ay - 3, ax, ay + 3);
-                SDL_RenderLine(renderer, ax + 4, ay - 3, ax, ay + 3);
+            if (ax > viewLeft && ax < viewRight) {
+                SDL_SetRenderDrawColor(renderer, style_.headerText[0], style_.headerText[1], style_.headerText[2], 255);
+                if (dir_ == SortDir::Ascending) {
+                    SDL_RenderLine(renderer, ax - 4, ay + 3, ax + 4, ay + 3);
+                    SDL_RenderLine(renderer, ax - 4, ay + 3, ax, ay - 3);
+                    SDL_RenderLine(renderer, ax + 4, ay + 3, ax, ay - 3);
+                } else {
+                    SDL_RenderLine(renderer, ax - 4, ay - 3, ax + 4, ay - 3);
+                    SDL_RenderLine(renderer, ax - 4, ay - 3, ax, ay + 3);
+                    SDL_RenderLine(renderer, ax + 4, ay - 3, ax, ay + 3);
+                }
             }
         }
 
@@ -248,17 +294,15 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
         SDL_RenderLine(renderer, x_, y_ + hH, x_ + w_, y_ + hH);
     }
 
-    // Body rows (clipped, only the visible range).
-    SDL_Rect bodyClip{ int(x_) + 1, int(bodyTop), int(w_) - 2, int(bodyH) };
+    // Body rows (clipped to the content viewport, only the visible range).
+    SDL_Rect bodyClip{ int(viewLeft), int(bodyTop), int(viewW_), int(bodyH_) };
     SDL_SetRenderClipRect(renderer, &bodyClip);
     int first = std::max(0, int(scroll_ / rh));
-    int last  = std::min(rowCount() - 1, int((scroll_ + bodyH) / rh));
+    int last  = std::min(rowCount() - 1, int((scroll_ + bodyH_) / rh));
     for (int i = first; i <= last; ++i) {
-        // Reset to the body clip: drawCell narrows the clip per cell, so the
-        // next row's highlight fill must restore the full-width viewport first.
-        SDL_SetRenderClipRect(renderer, &bodyClip);
+        SDL_SetRenderClipRect(renderer, &bodyClip);   // restore after per-cell clips
         float rowY = bodyTop + i * rh - scroll_;
-        SDL_FRect row{ x_ + 1, rowY, w_ - 2, float(rh) };
+        SDL_FRect row{ viewLeft, rowY, viewW_, float(rh) };
         const unsigned char* txt = style_.item;
         if (i == selected_) {
             SDL_SetRenderDrawColor(renderer, style_.selectedBg[0], style_.selectedBg[1], style_.selectedBg[2], 255);
@@ -271,23 +315,23 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
         const Row& data = rows_[order_[i]];   // display order (post-sort)
         for (int c = 0; c < int(columns_.size()); ++c) {
             const std::string& cell = (c < int(data.size())) ? data[c] : std::string();
-            drawCell(cell, columns_[c], columnX(c), rowY, float(rh), txt);
+            drawCell(cell, columns_[c], columnX(c) - hscroll_, rowY, float(rh), txt);
         }
     }
     SDL_SetRenderClipRect(renderer, nullptr);
 
-    // Vertical gridlines between columns (within the body).
+    // Vertical gridlines between columns.
     SDL_SetRenderDrawColor(renderer, style_.gridline[0], style_.gridline[1], style_.gridline[2], 255);
     for (int c = 1; c < int(columns_.size()); ++c) {
-        float gx = columnX(c);
-        if (gx > x_ && gx < x_ + w_) SDL_RenderLine(renderer, gx, y_ + 1, gx, y_ + h_ - 1);
+        float gx = columnX(c) - hscroll_;
+        if (gx > viewLeft && gx < viewRight) SDL_RenderLine(renderer, gx, y_ + 1, gx, y_ + h_ - 1);
     }
 
     SDL_SetRenderDrawColor(renderer, style_.border[0], style_.border[1], style_.border[2], 255);
     SDL_RenderRect(renderer, &rect);
 
-    syncBar(font);
     bar_.draw(renderer);
+    hbar_.draw(renderer);
 }
 
 } // namespace sdlw

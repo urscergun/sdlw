@@ -17,36 +17,42 @@ bool Scrollbar::hit(float px, float py) const {
     return px >= x_ && px < x_ + w_ && py >= y_ && py < y_ + h_;
 }
 
-void Scrollbar::thumbGeom(float& thumbY, float& thumbH) const {
+// Geometry along the scroll axis (Y for vertical, X for horizontal).
+void Scrollbar::thumbGeom(float& thumbStart, float& thumbLen) const {
+    float trackStart = (orient_ == Orient::Vertical) ? y_ : x_;
+    float trackLen   = (orient_ == Orient::Vertical) ? h_ : w_;
     float frac = (content_ > 0) ? std::min(1.0f, view_ / content_) : 1.0f;
-    thumbH = std::max(20.0f, h_ * frac);
+    thumbLen = std::max(20.0f, trackLen * frac);
     float maxS = maxScroll();
     float t = (maxS > 0) ? (value_ / maxS) : 0.0f;
-    thumbY = y_ + t * (h_ - thumbH);
+    thumbStart = trackStart + t * (trackLen - thumbLen);
 }
 
 bool Scrollbar::update(Window& win) {
     if (!needed()) { dragging_ = false; value_ = 0; return false; }
 
-    float mx = win.mouseX(), my = win.mouseY();
+    bool vert = (orient_ == Orient::Vertical);
+    float along = vert ? win.mouseY() : win.mouseX();
+    float trackStart = vert ? y_ : x_;
+    float trackLen   = vert ? h_ : w_;
     bool down = win.mouseDown();
     float old = value_;
 
-    float thumbY, thumbH;
-    thumbGeom(thumbY, thumbH);
+    float thumbStart, thumbLen;
+    thumbGeom(thumbStart, thumbLen);
 
-    if (win.mousePressed() && hit(mx, my)) {
-        if (my >= thumbY && my < thumbY + thumbH) {   // grab the thumb
+    if (win.mousePressed() && hit(win.mouseX(), win.mouseY())) {
+        if (along >= thumbStart && along < thumbStart + thumbLen) {  // grab the thumb
             dragging_ = true;
-            grab_ = my - thumbY;
-        } else {                                       // page toward the click
-            value_ += (my < thumbY) ? -view_ : view_;
+            grab_ = along - thumbStart;
+        } else {                                                      // page toward the click
+            value_ += (along < thumbStart) ? -view_ : view_;
         }
     }
 
     if (down && dragging_) {                            // map thumb position -> value
-        float denom = h_ - thumbH;
-        float t = (denom > 0) ? (my - grab_ - y_) / denom : 0.0f;
+        float denom = trackLen - thumbLen;
+        float t = (denom > 0) ? (along - grab_ - trackStart) / denom : 0.0f;
         value_ = std::clamp(t, 0.0f, 1.0f) * maxScroll();
     }
     if (!down) dragging_ = false;
@@ -57,11 +63,13 @@ bool Scrollbar::update(Window& win) {
 
 void Scrollbar::draw(SDL_Renderer* renderer) const {
     if (!needed()) return;
-    float thumbY, thumbH;
-    thumbGeom(thumbY, thumbH);
+    float thumbStart, thumbLen;
+    thumbGeom(thumbStart, thumbLen);
     const unsigned char* c = dragging_ ? style_.thumbActive : style_.thumb;
     SDL_SetRenderDrawColor(renderer, c[0], c[1], c[2], 255);
-    SDL_FRect thumb{ x_, thumbY, w_, thumbH };
+    SDL_FRect thumb = (orient_ == Orient::Vertical)
+                          ? SDL_FRect{ x_, thumbStart, w_, thumbLen }
+                          : SDL_FRect{ thumbStart, y_, thumbLen, h_ };
     SDL_RenderFillRect(renderer, &thumb);
 }
 

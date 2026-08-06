@@ -85,11 +85,12 @@ public:
 private:
     int   rowHeight(Font& font) const;
     float headerHeight(Font& font) const;
-    void  syncBar(Font& font);
+    void  layoutBars(Font& font);           // size both scrollbars; sets viewW_/bodyH_
     void  scrollToSelected(Font& font);
     float maxScroll(Font& font) const;
-    float columnX(int i) const;             // left x of column i
-    int   columnAtX(float mx) const;        // column under x, or -1
+    float contentWidth() const;             // sum of column widths
+    float columnX(int i) const;             // left x of column i (content space)
+    int   columnAtX(float contentMx) const; // column under a content-space x, or -1
     void  rebuildOrder();                   // rebuild display order from current sort
     std::string cellStr(int row, int col) const;
 
@@ -100,14 +101,17 @@ private:
     Style style_;
     int   selected_ = -1;                    // display index into order_
     int   hover_ = -1;
-    float scroll_ = 0;
+    float scroll_ = 0;                       // vertical scroll (px)
+    float hscroll_ = 0;                      // horizontal scroll (px)
     bool  focused_ = false;
     bool  showHeader_ = true;
     bool  activated_ = false;
     int   rowPad_ = 6;
     int   sortCol_ = -1;                     // sorted column, or -1 (unordered)
     SortDir dir_ = SortDir::None;
-    Scrollbar bar_;
+    float viewW_ = 0, bodyH_ = 0;            // content viewport (set by layoutBars)
+    Scrollbar bar_;                          // vertical
+    Scrollbar hbar_;                         // horizontal
 };
 
 } // namespace sdlw
