@@ -52,6 +52,7 @@ add_library(sdlw STATIC
     src/scrollbar.cpp
     src/scrollview.cpp
     src/listview.cpp
+    src/layout.cpp
 )
 target_include_directories(sdlw PUBLIC include)
 target_link_libraries(sdlw PUBLIC ${SDLW_SDL_TARGET})
@@ -98,12 +99,15 @@ endif()
 if(SDLW_BUILD_TESTS)
     enable_testing()
 
-    # Pure-logic tests: header-only, no SDL headers needed.
+    # Pure-logic tests: no SDL. test_layout also uses the public layout header.
     foreach(t test_text test_bmfont)
         add_executable(${t} tests/${t}.cpp)
         target_include_directories(${t} PRIVATE src tests)
         add_test(NAME ${t} COMMAND ${t})
     endforeach()
+    add_executable(test_layout tests/test_layout.cpp src/layout.cpp)
+    target_include_directories(test_layout PRIVATE include tests)
+    add_test(NAME test_layout COMMAND test_layout)
 
     # Headless widget tests: compile the widget sources against SDL *headers*
     # plus a no-op SDL link stub, so they run without a display or the SDL
