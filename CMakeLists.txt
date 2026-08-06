@@ -1,9 +1,20 @@
 cmake_minimum_required(VERSION 3.16)
-project(sdlw LANGUAGES C CXX)
+project(sdlw VERSION 0.1.0 LANGUAGES C CXX)
 
 # C++20 for designated initializers ({.title = ...}) used by the window API.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include(GNUInstallDirs)
+
+# Whether to generate install/package rules (headers + lib + CMake config).
+# On by default for a top-level build; off when sdlw is a subproject.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_sdlw_top_level ON)
+else()
+    set(_sdlw_top_level OFF)
+endif()
+option(SDLW_INSTALL "Generate install/package rules for sdlw" ${_sdlw_top_level})
 
 # libSDL is the only external dependency. By default we build the vendored
 # copy in vendor/SDL (a git submodule) so the project has zero system deps.
@@ -18,10 +29,15 @@ else()
             "vendor/SDL is empty. Fetch the submodule first:\n"
             "  git submodule update --init --recursive")
     endif()
-    # Build SDL3 as a static lib in-tree; no install, no shared object.
+    # Build SDL3 as a static lib in-tree; no shared object.
     set(SDL_SHARED       OFF CACHE BOOL "" FORCE)
     set(SDL_STATIC       ON  CACHE BOOL "" FORCE)
     set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+    # When we install sdlw, also install the vendored SDL3 so apps that link the
+    # installed libsdlw can resolve SDL3 (find_dependency(SDL3) in the config).
+    if(SDLW_INSTALL)
+        set(SDL_INSTALL ON CACHE BOOL "" FORCE)
+    endif()
     add_subdirectory(vendor/SDL EXCLUDE_FROM_ALL)
 endif()
 
@@ -54,27 +70,16 @@ add_library(sdlw STATIC
     src/listview.cpp
     src/layout.cpp
 )
-target_include_directories(sdlw PUBLIC include)
+target_include_directories(sdlw PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(sdlw PUBLIC ${SDLW_SDL_TARGET})
+add_library(sdlw::sdlw ALIAS sdlw)
 
 # --- Asset embedding -------------------------------------------------------
-# Turn a binary asset into a compiled C byte array (regenerated when it
-# changes). Fully in-house: just CMake + the C compiler, no extra tools.
-set(SDLW_GEN_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
-file(MAKE_DIRECTORY ${SDLW_GEN_DIR})
-
-function(sdlw_embed_asset input symbol out_var)
-    set(out "${SDLW_GEN_DIR}/${symbol}.c")
-    add_custom_command(
-        OUTPUT  "${out}"
-        COMMAND ${CMAKE_COMMAND}
-                -DINPUT=${input} -DOUTPUT=${out} -DSYMBOL=${symbol}
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/tools/bin2c.cmake
-        DEPENDS ${input} ${CMAKE_CURRENT_SOURCE_DIR}/tools/bin2c.cmake
-        COMMENT "Embedding ${input}"
-        VERBATIM)
-    set(${out_var} "${out}" PARENT_SCOPE)
-endfunction()
+# sdlw_embed_asset(): bake a binary asset (e.g. a baked font) into a compiled
+# C byte array. Shared with consumers via the installed package.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdlwEmbed.cmake)
 
 # Bake every DejaVu Sans size into the executable.
 set(SDLW_FONT_SIZES 14 16 20 24 32)
@@ -123,4 +128,56 @@ if(SDLW_BUILD_TESTS)
     target_include_directories(test_widgets PRIVATE
         include src tests ${CMAKE_CURRENT_SOURCE_DIR}/vendor/SDL/include)
     add_test(NAME test_widgets COMMAND test_widgets)
+endif()
+
+# --- Install / package -----------------------------------------------------
+# `cmake --install <build> --prefix <dir>` produces a self-contained SDK:
+#   include/sdlw/*.h         public headers
+#   lib/libsdlw.a            the sdlw static library (+ SDL3 static lib)
+#   lib/cmake/sdlw/*.cmake   package config so apps can find_package(sdlw)
+#   share/sdlw/tools         bake_font.py to bake your own fonts
+# Consuming app:
+#   find_package(sdlw CONFIG REQUIRED)   # CMAKE_PREFIX_PATH -> the install dir
+#   target_link_libraries(app PRIVATE sdlw::sdlw)
+if(SDLW_INSTALL)
+    include(CMakePackageConfigHelpers)
+
+    install(TARGETS sdlw EXPORT sdlwTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+    install(DIRECTORY include/sdlw DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+    install(EXPORT sdlwTargets
+        NAMESPACE sdlw::
+        FILE sdlwTargets.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/sdlw)
+
+    configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdlwConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/sdlwConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/sdlw)
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/sdlwConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion)
+
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/sdlwConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/sdlwConfigVersion.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdlwEmbed.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/tools/bin2c.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/sdlw)
+
+    # Font-baking tool + baked DejaVu Sans atlases (bake or embed your own).
+    install(PROGRAMS tools/bake_font.py DESTINATION ${CMAKE_INSTALL_DATADIR}/sdlw/tools)
+    install(DIRECTORY assets/ DESTINATION ${CMAKE_INSTALL_DATADIR}/sdlw/fonts
+        FILES_MATCHING PATTERN "dejavusans_*.fnt" PATTERN "dejavusans_*.bmp")
+
+    # Optional: `cpack` from the build dir makes a distributable archive.
+    set(CPACK_PACKAGE_NAME sdlw)
+    set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+    set(CPACK_GENERATOR "TGZ")
+    include(CPack)
 endif()
