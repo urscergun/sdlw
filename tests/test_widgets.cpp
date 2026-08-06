@@ -15,6 +15,7 @@
 #include "sdlw/scrollbar.h"
 #include "sdlw/scrollview.h"
 #include "sdlw/listbox.h"
+#include "sdlw/listview.h"
 
 #include <string>
 
@@ -365,6 +366,51 @@ TEST(listbox_scrolls_with_wheel_and_bar) {
     list.update(win, font);
     CHECK_EQ(list.selected(), 19);
     CHECK_STR_EQ(*list.selectedItem(), "item19");
+}
+
+TEST(listview_select_navigate_activate) {
+    Window win{Window::Headless{}};
+    Font font; loadMono(font);          // lineHeight 20 -> rowHeight 26, headerH 26
+    ListView lv(0, 0, 300, 200);
+    lv.setColumns({ { "Name", 140, ListView::Align::Left },
+                    { "Age", 60, ListView::Align::Right },
+                    { "City", 100, ListView::Align::Left } });
+    lv.setRows({
+        { "Ada", "36", "London" },
+        { "Alan", "41", "Bletchley" },
+        { "Grace", "45", "New York" },
+        { "Edsger", "40", "Austin" },
+    });
+
+    // Body starts below the header: bodyTop = 0 + 26 + 1 = 27. Row 1 spans
+    // y 27+26 .. -> click y=60 selects row 1.
+    win.clearFrameInput(); win.feedMouse(30, 60, true); win.feedMousePress(1);
+    CHECK(lv.update(win, font));
+    CHECK_EQ(lv.selected(), 1);
+    const ListView::Row* r = lv.selectedRow();
+    CHECK(r != nullptr);
+    CHECK_STR_EQ((*r)[0], "Alan");
+    CHECK_STR_EQ((*r)[2], "Bletchley");
+
+    // Keyboard: Down moves selection, End jumps to last.
+    win.clearFrameInput(); win.feedKey(Key::Down);
+    lv.update(win, font);
+    CHECK_EQ(lv.selected(), 2);
+    win.clearFrameInput(); win.feedKey(Key::End);
+    lv.update(win, font);
+    CHECK_EQ(lv.selected(), 3);
+    CHECK_STR_EQ((*lv.selectedRow())[0], "Edsger");
+
+    // Double-click activates a row.
+    win.clearFrameInput(); win.feedMouse(30, 35, true); win.feedMousePress(2);
+    lv.update(win, font);
+    CHECK(lv.rowActivated());
+    CHECK_EQ(lv.selected(), 0);
+
+    // Enter also activates.
+    win.clearFrameInput(); win.feedKey(Key::Enter);
+    lv.update(win, font);
+    CHECK(lv.rowActivated());
 }
 
 SDLW_TEST_MAIN()
