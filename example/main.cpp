@@ -145,7 +145,7 @@ int Main(int argc, char** argv) {
     sdlw::FocusManager focus;
     focus.add(&name); focus.add(&country); focus.add(&lang);
     focus.add(&subscribe); focus.add(&plan);
-    focus.add(&items); focus.add(&table);
+    focus.add(&items); focus.add(&view); focus.add(&table);
     focus.add(&submit); focus.add(&reset);
 
     float t = 0;

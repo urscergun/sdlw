@@ -15,6 +15,7 @@
 #pragma once
 
 #include "sdlw/scrollbar.h"
+#include "sdlw/focus.h"
 
 struct SDL_Renderer;
 
@@ -22,7 +23,7 @@ namespace sdlw {
 
 class Window;
 
-class ScrollView {
+class ScrollView : public Focusable {
 public:
     struct Style {
         unsigned char bg[3]     = { 30, 30, 38 };
@@ -51,10 +52,16 @@ public:
     void beginContent(SDL_Renderer* renderer);
     void endContent(SDL_Renderer* renderer);
 
+    // Focusable — when focused, arrows / PageUp-Down / Home-End scroll it.
+    void focusRect(float& x, float& y, float& w, float& h) const override { x = x_; y = y_; w = w_; h = h_; }
+    void setFocus(bool f, Window&) override { focused_ = f; }
+    bool focused() const override { return focused_; }
+
 private:
     Scrollbar bar_;
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
     float contentH_ = 0;
+    bool  focused_ = false;
     Style style_;
 };
 

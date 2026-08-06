@@ -326,6 +326,32 @@ TEST(scrollbar_drag_page_and_clamp) {
     CHECK_EQ(int(small.maxScroll()), 0);
 }
 
+TEST(scrollview_focus_and_keyboard_scroll) {
+    Window win{Window::Headless{}};
+    ScrollView view(0, 0, 200, 100);   // inner height 98
+    view.setContentHeight(500);        // maxScroll 402
+
+    FocusManager focus;
+    focus.add(&view);
+
+    // Tab focuses the ScrollView.
+    win.clearFrameInput(); win.feedKey(Key::Tab);
+    focus.update(win);
+    CHECK(focus.focused() == &view);
+    CHECK(view.focused());
+
+    // Down / PageDown / End scroll while focused.
+    win.clearFrameInput(); win.feedKey(Key::Down);
+    view.update(win);
+    CHECK(view.scroll() > 0);
+    win.clearFrameInput(); win.feedKey(Key::End);
+    view.update(win);
+    CHECK(view.scroll() >= 402 - 0.5f);   // End jumps to the bottom
+    win.clearFrameInput(); win.feedKey(Key::Home);
+    view.update(win);
+    CHECK_EQ(int(view.scroll()), 0);
+}
+
 TEST(scrollview_wheel_and_content_origin) {
     Window win{Window::Headless{}};
     ScrollView view(0, 0, 200, 100);   // viewport 100 tall (inner 98)
