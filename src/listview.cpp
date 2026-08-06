@@ -322,9 +322,10 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
     }
     SDL_SetRenderClipRect(renderer, nullptr);
 
-    // Vertical gridlines between columns.
+    // Vertical gridlines between columns, plus the right edge of the last column
+    // (so it reads as a real column when the widget is wider than the content).
     SDL_SetRenderDrawColor(renderer, style_.gridline[0], style_.gridline[1], style_.gridline[2], 255);
-    for (int c = 1; c < int(columns_.size()); ++c) {
+    for (int c = 1; c <= int(columns_.size()); ++c) {
         float gx = columnX(c) - hscroll_;
         if (gx > viewLeft && gx < viewRight) SDL_RenderLine(renderer, gx, y_ + 1, gx, y_ + h_ - 1);
     }
