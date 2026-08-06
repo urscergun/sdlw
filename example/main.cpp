@@ -1,13 +1,9 @@
-// Example sdlw application: a large window exercising every widget.
+// Example sdlw application: every widget, arranged with the layout engine.
 //
-// Column 1 (form):  text field, combo box, select, checkbox, radio group,
-//                   progress bar, buttons.
-// Column 2 (lists): a scrollable ListBox and a ScrollView panel of content.
-// Column 3 (table): a multi-column ListView.
-//
-// Tab / Shift+Tab move keyboard focus (ring); Space/Enter activate; arrow keys
-// drive the radio, list, and table. All fonts are embedded — no external files.
-// There is no WinMain/main here; sdlw supplies the entry point and calls Main().
+// Instead of hand-placed pixel coordinates, widgets are put into VBox/HBox
+// containers and given Fixed/Flex sizes; the tree is arranged into the window
+// each frame, so the UI reflows when the window is resized. Tab moves focus;
+// all fonts are embedded. sdlw provides the entry point and calls Main().
 #include "sdlw/window.h"
 #include "sdlw/font.h"
 #include "sdlw/label.h"
@@ -22,6 +18,7 @@
 #include "sdlw/button.h"
 #include "sdlw/scrollview.h"
 #include "sdlw/focus.h"
+#include "sdlw/layout.h"
 
 #include <cstdio>
 #include <string>
@@ -39,7 +36,7 @@ SDLW_DECL_FONT(24)
 int Main(int argc, char** argv) {
     (void)argc; (void)argv;
 
-    sdlw::Window win({ .title = "sdlw — all widgets", .width = 1040, .height = 700 });
+    sdlw::Window win({ .title = "sdlw — all widgets (layout)", .width = 1040, .height = 700 });
     if (!win.ok()) { std::fprintf(stderr, "window: %s\n", win.error()); return 1; }
 
     sdlw::Font heading, ui;
@@ -51,98 +48,97 @@ int Main(int argc, char** argv) {
         return 1;
     }
 
-    sdlw::Label title("sdlw — all widgets", 20, 16);
+    using namespace sdlw;
+    Label title("sdlw — all widgets (layout)", 0, 0);
 
-    // --- Column 1: form --------------------------------------------------
-    sdlw::Label   nameL("Name", 20, 60);
-    sdlw::TextBox name(20, 80, 300, 30);
-    name.setPlaceholder("Type your name...");
-
-    sdlw::Label    countryL("Country (combo — type to filter)", 20, 122);
-    sdlw::ComboBox country(20, 142, 300, 30);
-    country.setMaxVisibleRows(4);
+    // Column 1: form.
+    Label nameL("Name", 0, 0);
+    TextBox name; name.setPlaceholder("Type your name...");
+    Label countryL("Country (combo)", 0, 0);
+    ComboBox country; country.setMaxVisibleRows(4);
     country.setItems({ "Argentina", "Australia", "Brazil", "Canada", "China", "Denmark",
                        "Egypt", "France", "Germany", "India", "Italy", "Japan", "Mexico",
                        "Norway", "Poland", "Spain", "Sweden", "Switzerland" });
-
-    sdlw::Label   langL("Language (select)", 20, 300);
-    sdlw::Select  lang(20, 320, 300, 30);
-    lang.setMaxVisibleRows(4);
-    lang.setPlaceholder("Choose...");
+    Label langL("Language (select)", 0, 0);
+    Select lang; lang.setMaxVisibleRows(4); lang.setPlaceholder("Choose...");
     lang.setItems({ "C", "C++", "Python", "Rust", "Go", "Zig", "Lua" });
+    Checkbox subscribe("Email me updates", 0, 0, 0, 24);
+    Label planL("Plan", 0, 0);
+    RadioGroup plan(0, 0, 0, { "Free", "Pro", "Team" });
+    Label progL("Progress", 0, 0);
+    ProgressBar bar; bar.setShowPercent(true);
+    Button submit("Submit", 0, 0, 0, 0);
+    Button reset("Reset", 0, 0, 0, 0);
 
-    sdlw::Checkbox subscribe("Email me updates", 20, 372, 300, 24);
-
-    sdlw::Label      planL("Plan", 20, 406);
-    sdlw::RadioGroup plan(20, 426, 200, { "Free", "Pro", "Team" });
-
-    sdlw::Label       progL("Progress", 20, 516);
-    sdlw::ProgressBar bar(20, 536, 300, 18);
-    bar.setShowPercent(true);
-
-    sdlw::Button submit("Submit", 20, 566, 140, 34);
-    sdlw::Button reset("Reset",  180, 566, 140, 34);
-
-    // --- Column 2: lists -------------------------------------------------
-    sdlw::Label   itemsL("Items (ListBox)", 350, 60);
-    sdlw::ListBox items(350, 80, 300, 240);
+    // Column 2: lists.
+    Label itemsL("Items (ListBox)", 0, 0);
+    ListBox items;
     items.setItems({ "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf",
                      "Hotel", "India", "Juliet", "Kilo", "Lima", "Mike", "November",
                      "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango" });
     items.setSelected(0);
-
-    sdlw::Label      panelL("Scrollable panel (ScrollView)", 350, 340);
-    sdlw::ScrollView view(350, 360, 300, 300);
-    const int kLines = 28;
+    Label panelL("Scrollable panel (ScrollView)", 0, 0);
+    ScrollView view;
+    const int kLines = 30;
     view.setContentHeight(kLines * 24 + 12);
 
-    // --- Column 3: table -------------------------------------------------
-    sdlw::Label    tableL("People (ListView)", 680, 60);
-    sdlw::ListView table(680, 80, 340, 400);
-    // Click a column header to sort (unordered -> ascending -> descending).
-    // Total column width (490) exceeds the widget (340), so a horizontal
-    // scrollbar appears; Shift+wheel or the bottom bar scroll horizontally.
-    table.setColumns({ { "Name", 180, sdlw::ListView::Align::Left },
-                       { "Age", 70, sdlw::ListView::Align::Right, sdlw::ListView::SortType::Numeric },
-                       { "City", 130, sdlw::ListView::Align::Left },
-                       { "Role", 110, sdlw::ListView::Align::Left } });
+    // Column 3: table.
+    Label tableL("People (ListView — click headers to sort)", 0, 0);
+    ListView table;
+    table.setColumns({ { "Name", 180, ListView::Align::Left },
+                       { "Age", 70, ListView::Align::Right, ListView::SortType::Numeric },
+                       { "City", 130, ListView::Align::Left },
+                       { "Role", 110, ListView::Align::Left } });
     table.setRows({
-        { "Ada Lovelace", "36", "London", "Math" },
-        { "Alan Turing", "41", "Bletchley", "Crypto" },
-        { "Grace Hopper", "45", "New York", "Navy" },
-        { "Edsger Dijkstra", "40", "Austin", "CS" },
-        { "Katherine J.", "44", "Hampton", "NASA" },
-        { "Donald Knuth", "39", "Stanford", "Books" },
-        { "Barbara Liskov", "33", "Boston", "MIT" },
-        { "Linus Torvalds", "38", "Portland", "Linux" },
-        { "Margaret H.", "42", "Boston", "Apollo" },
-        { "Ken Thompson", "47", "Murray Hill", "Unix" },
-        { "Dennis Ritchie", "48", "Murray Hill", "C" },
-        { "John Carmack", "35", "Dallas", "Games" },
-        { "Bjarne S.", "43", "Aarhus", "C++" },
-        { "Guido van R.", "46", "Amsterdam", "Python" },
-        { "Tim Berners-Lee", "50", "London", "Web" },
-        { "Vint Cerf", "52", "Los Angeles", "TCP/IP" },
-        { "Radia Perlman", "49", "Seattle", "STP" },
-        { "James Gosling", "45", "Calgary", "Java" },
-        { "Anders Hejlsberg", "48", "Seattle", "C#" },
-        { "Brendan Eich", "44", "San Jose", "JS" },
-        { "Rasmus Lerdorf", "43", "Toronto", "PHP" },
-        { "Yukihiro M.", "47", "Matsue", "Ruby" },
-        { "Rich Hickey", "51", "New York", "Clojure" },
-        { "Joe Armstrong", "53", "Stockholm", "Erlang" },
-        { "Simon P. Jones", "54", "Cambridge", "Haskell" },
-        { "Chris Lattner", "37", "Cupertino", "Swift" },
-        { "Andrew Kelley", "34", "NYC", "Zig" },
-        { "Graydon Hoare", "45", "Vancouver", "Rust" },
+        { "Ada Lovelace", "36", "London", "Math" }, { "Alan Turing", "41", "Bletchley", "Crypto" },
+        { "Grace Hopper", "45", "New York", "Navy" }, { "Edsger Dijkstra", "40", "Austin", "CS" },
+        { "Katherine J.", "44", "Hampton", "NASA" }, { "Donald Knuth", "39", "Stanford", "Books" },
+        { "Barbara Liskov", "33", "Boston", "MIT" }, { "Linus Torvalds", "38", "Portland", "Linux" },
+        { "Margaret H.", "42", "Boston", "Apollo" }, { "Ken Thompson", "47", "Murray Hill", "Unix" },
+        { "Dennis Ritchie", "48", "Murray Hill", "C" }, { "John Carmack", "35", "Dallas", "Games" },
+        { "Bjarne S.", "43", "Aarhus", "C++" }, { "Guido van R.", "46", "Amsterdam", "Python" },
+        { "Tim Berners-Lee", "50", "London", "Web" }, { "Vint Cerf", "52", "Los Angeles", "TCP/IP" },
+        { "Radia Perlman", "49", "Seattle", "STP" }, { "James Gosling", "45", "Calgary", "Java" },
+        { "Brendan Eich", "44", "San Jose", "JS" }, { "Yukihiro M.", "47", "Matsue", "Ruby" },
     });
     table.setSelected(0);
-
-    sdlw::Label status("", 680, 500);
+    Label status("", 0, 0);
     status.style().color[0] = 150; status.style().color[1] = 230; status.style().color[2] = 170;
 
-    // --- Tab order -------------------------------------------------------
-    sdlw::FocusManager focus;
+    // --- Layout tree ------------------------------------------------------
+    HBox buttons({ .spacing = 8 });
+    buttons.add(submit, Size::flex(1));
+    buttons.add(reset,  Size::flex(1));
+
+    VBox col1({ .spacing = 6 });
+    col1.add(nameL, Size::fixed(20));     col1.add(name, Size::fixed(30));
+    col1.add(countryL, Size::fixed(20));  col1.add(country, Size::fixed(30));
+    col1.add(langL, Size::fixed(20));     col1.add(lang, Size::fixed(30));
+    col1.add(subscribe, Size::fixed(24));
+    col1.add(planL, Size::fixed(20));     col1.add(plan, Size::fixed(78));
+    col1.add(progL, Size::fixed(20));     col1.add(bar, Size::fixed(18));
+    col1.add(buttons, Size::fixed(34));
+    col1.addSpacer(Size::flex());         // push the form up
+
+    VBox col2({ .spacing = 6 });
+    col2.add(itemsL, Size::fixed(20));    col2.add(items, Size::flex(1));
+    col2.add(panelL, Size::fixed(20));    col2.add(view, Size::flex(1));
+
+    VBox col3({ .spacing = 6 });
+    col3.add(tableL, Size::fixed(20));    col3.add(table, Size::flex(1));
+    col3.add(status, Size::fixed(24));
+
+    HBox columns({ .spacing = 20 });
+    columns.add(col1, Size::flex(1));
+    columns.add(col2, Size::flex(1));
+    columns.add(col3, Size::flex(1.3f));
+
+    VBox root({ .padding = 16, .spacing = 12 });
+    root.add(title, Size::fixed(32));
+    root.add(columns, Size::flex(1));
+
+    // Tab order.
+    FocusManager focus;
     focus.add(&name); focus.add(&country); focus.add(&lang);
     focus.add(&subscribe); focus.add(&plan);
     focus.add(&items); focus.add(&view); focus.add(&table);
@@ -150,19 +146,14 @@ int Main(int argc, char** argv) {
 
     float t = 0;
     while (win.pumpEvents()) {
+        // Arrange the whole tree into the current window size (handles resizing).
+        root.arrange({ 0, 0, float(win.width()), float(win.height()) });
+
         focus.update(win);
-        name.update(win, ui);
-        country.update(win, ui);
-        lang.update(win, ui);
-        subscribe.update(win);
-        plan.update(win);
-        items.update(win, ui);
-        table.update(win, ui);
-        view.update(win);
-        if (submit.update(win)) {
-            std::string who = name.text().empty() ? "(no name)" : name.text();
-            status.setText("Submitted: " + who);
-        }
+        name.update(win, ui);   country.update(win, ui); lang.update(win, ui);
+        subscribe.update(win);  plan.update(win);
+        items.update(win, ui);  table.update(win, ui);   view.update(win);
+        if (submit.update(win)) status.setText("Submitted: " + (name.text().empty() ? std::string("(no name)") : name.text()));
         if (reset.update(win)) {
             name.setText(""); country.setText(""); lang.setSelected(-1);
             subscribe.setChecked(false); plan.setSelected(0); status.setText("");
@@ -174,17 +165,15 @@ int Main(int argc, char** argv) {
         title.style().color[0] = 120; title.style().color[1] = 200; title.style().color[2] = 255;
         title.draw(win.renderer(), heading);
 
-        // Column 1
-        nameL.draw(win.renderer(), ui);      name.draw(win.renderer(), ui);
+        nameL.draw(win.renderer(), ui);    name.draw(win.renderer(), ui);
         countryL.draw(win.renderer(), ui);
         langL.draw(win.renderer(), ui);
         subscribe.draw(win.renderer(), ui);
-        planL.draw(win.renderer(), ui);      plan.draw(win.renderer(), ui);
-        progL.draw(win.renderer(), ui);      bar.draw(win.renderer(), ui);
-        submit.draw(win.renderer(), ui);     reset.draw(win.renderer(), ui);
+        planL.draw(win.renderer(), ui);    plan.draw(win.renderer(), ui);
+        progL.draw(win.renderer(), ui);    bar.draw(win.renderer(), ui);
+        submit.draw(win.renderer(), ui);   reset.draw(win.renderer(), ui);
 
-        // Column 2
-        itemsL.draw(win.renderer(), ui);     items.draw(win.renderer(), ui);
+        itemsL.draw(win.renderer(), ui);   items.draw(win.renderer(), ui);
         panelL.draw(win.renderer(), ui);
         view.beginContent(win.renderer());
         for (int i = 0; i < kLines; ++i) {
@@ -194,12 +183,10 @@ int Main(int argc, char** argv) {
         }
         view.endContent(win.renderer());
 
-        // Column 3
-        tableL.draw(win.renderer(), ui);     table.draw(win.renderer(), ui);
+        tableL.draw(win.renderer(), ui);   table.draw(win.renderer(), ui);
         status.draw(win.renderer(), ui);
 
-        // Dropdowns last so their popups sit on top.
-        country.draw(win.renderer(), ui);
+        country.draw(win.renderer(), ui);  // dropdowns last (popups on top)
         lang.draw(win.renderer(), ui);
 
         focus.drawFocusRing(win.renderer());

@@ -30,6 +30,9 @@ public:
     RadioGroup(float x, float y, float w, std::vector<std::string> options, float rowHeight = 26);
 
     void setRect(float x, float y, float w) { x_ = x; y_ = y; w_ = w; }
+    // 4-arg form for layout containers; the height is derived from rows, so it
+    // is ignored here.
+    void setRect(float x, float y, float w, float) { x_ = x; y_ = y; w_ = w; }
     void setOptions(std::vector<std::string> options);
     void setRowHeight(float h) { rowH_ = h; }
     void setSelected(int index);
