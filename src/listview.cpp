@@ -218,8 +218,14 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
         SDL_FRect hdr{ x_, y_, w_, hH };
         SDL_SetRenderDrawColor(renderer, style_.headerBg[0], style_.headerBg[1], style_.headerBg[2], 255);
         SDL_RenderFillRect(renderer, &hdr);
-        for (int c = 0; c < int(columns_.size()); ++c)
-            drawCell(columns_[c].title, columns_[c], columnX(c), y_, hH, style_.headerText);
+        // Reserve room on the right of sortable headers for the sort arrow, so
+        // the title never runs underneath it.
+        const float kSortIconW = 16.0f;
+        for (int c = 0; c < int(columns_.size()); ++c) {
+            Column hc = columns_[c];
+            if (hc.sortable) hc.width = std::max(0.0f, hc.width - kSortIconW);
+            drawCell(columns_[c].title, hc, columnX(c), y_, hH, style_.headerText);
+        }
         SDL_SetRenderClipRect(renderer, nullptr);
 
         // Sort arrow on the active column (up = ascending, down = descending).
