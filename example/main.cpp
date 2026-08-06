@@ -118,6 +118,20 @@ int Main(int argc, char** argv) {
         { "John Carmack", "35", "Dallas", "Games" },
         { "Bjarne S.", "43", "Aarhus", "C++" },
         { "Guido van R.", "46", "Amsterdam", "Python" },
+        { "Tim Berners-Lee", "50", "London", "Web" },
+        { "Vint Cerf", "52", "Los Angeles", "TCP/IP" },
+        { "Radia Perlman", "49", "Seattle", "STP" },
+        { "James Gosling", "45", "Calgary", "Java" },
+        { "Anders Hejlsberg", "48", "Seattle", "C#" },
+        { "Brendan Eich", "44", "San Jose", "JS" },
+        { "Rasmus Lerdorf", "43", "Toronto", "PHP" },
+        { "Yukihiro M.", "47", "Matsue", "Ruby" },
+        { "Rich Hickey", "51", "New York", "Clojure" },
+        { "Joe Armstrong", "53", "Stockholm", "Erlang" },
+        { "Simon P. Jones", "54", "Cambridge", "Haskell" },
+        { "Chris Lattner", "37", "Cupertino", "Swift" },
+        { "Andrew Kelley", "34", "NYC", "Zig" },
+        { "Graydon Hoare", "45", "Vancouver", "Rust" },
     });
     table.setSelected(0);
 
