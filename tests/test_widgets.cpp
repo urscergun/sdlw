@@ -413,4 +413,57 @@ TEST(listview_select_navigate_activate) {
     CHECK(lv.rowActivated());
 }
 
+TEST(listview_column_sorting) {
+    Window win{Window::Headless{}};
+    Font font; loadMono(font);          // headerH = 26
+    ListView lv(0, 0, 300, 400);
+    lv.setColumns({ { "Name", 150, ListView::Align::Left,  ListView::SortType::Alpha },
+                    { "Age",  80,  ListView::Align::Right, ListView::SortType::Numeric } });
+    lv.setRows({
+        { "Charlie", "30" },
+        { "alice",   "9" },   // lowercase -> tests case-insensitive alpha
+        { "Bob",     "100" }, // 100 > 9 numerically (would be "1.." < "9" as text)
+    });
+
+    auto clickHeader = [&](int colCenterX) {
+        win.clearFrameInput();
+        win.feedMouse(float(colCenterX), 12, true);   // y=12 is inside the header
+        win.feedMousePress(1);
+        lv.update(win, font);
+    };
+
+    // Sort by Name (col 0, center ~75) ascending: alice, Bob, Charlie (CI).
+    clickHeader(75);
+    CHECK_EQ(lv.sortColumn(), 0);
+    CHECK_STR_EQ((*lv.rowAt(0))[0], "alice");
+    CHECK_STR_EQ((*lv.rowAt(1))[0], "Bob");
+    CHECK_STR_EQ((*lv.rowAt(2))[0], "Charlie");
+
+    // Click Name again -> descending: Charlie, Bob, alice.
+    clickHeader(75);
+    CHECK_STR_EQ((*lv.rowAt(0))[0], "Charlie");
+    CHECK_STR_EQ((*lv.rowAt(2))[0], "alice");
+
+    // Third click -> unordered (original insertion order).
+    clickHeader(75);
+    CHECK_EQ(lv.sortColumn(), -1);
+    CHECK_STR_EQ((*lv.rowAt(0))[0], "Charlie");
+    CHECK_STR_EQ((*lv.rowAt(1))[0], "alice");
+    CHECK_STR_EQ((*lv.rowAt(2))[0], "Bob");
+
+    // Sort by Age (col 1, center ~190) numeric ascending: 9, 30, 100.
+    clickHeader(190);
+    CHECK_EQ(lv.sortColumn(), 1);
+    CHECK_STR_EQ((*lv.rowAt(0))[1], "9");
+    CHECK_STR_EQ((*lv.rowAt(1))[1], "30");
+    CHECK_STR_EQ((*lv.rowAt(2))[1], "100");
+
+    // Selection follows the item across a re-sort.
+    lv.setSelected(0);                       // "9" (alice)
+    CHECK_STR_EQ((*lv.selectedRow())[0], "alice");
+    clickHeader(190);                        // Age descending: 100, 30, 9
+    CHECK_STR_EQ((*lv.rowAt(0))[1], "100");
+    CHECK_STR_EQ((*lv.selectedRow())[0], "alice");  // still selected after re-sort
+}
+
 SDLW_TEST_MAIN()

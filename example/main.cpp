@@ -99,8 +99,9 @@ int Main(int argc, char** argv) {
     // --- Column 3: table -------------------------------------------------
     sdlw::Label    tableL("People (ListView)", 680, 60);
     sdlw::ListView table(680, 80, 340, 400);
+    // Click a column header to sort (unordered -> ascending -> descending).
     table.setColumns({ { "Name", 140, sdlw::ListView::Align::Left },
-                       { "Age", 50, sdlw::ListView::Align::Right },
+                       { "Age", 50, sdlw::ListView::Align::Right, sdlw::ListView::SortType::Numeric },
                        { "City", 90, sdlw::ListView::Align::Left },
                        { "Role", 60, sdlw::ListView::Align::Left } });
     table.setRows({

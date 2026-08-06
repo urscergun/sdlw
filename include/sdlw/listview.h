@@ -21,7 +21,15 @@ class Font;
 class ListView : public Focusable {
 public:
     enum class Align { Left, Right };
-    struct Column { std::string title; float width = 100; Align align = Align::Left; };
+    enum class SortType { Alpha, Numeric };
+    enum class SortDir { None, Ascending, Descending };
+    struct Column {
+        std::string title;
+        float    width = 100;
+        Align    align = Align::Left;
+        SortType sort = SortType::Alpha; // how this column compares when sorted
+        bool     sortable = true;        // clicking the header cycles the sort
+    };
 
     struct Style {
         unsigned char bg[3]           = { 34,  34,  42 };
@@ -54,6 +62,13 @@ public:
     int selected() const { return selected_; }
     void setSelected(int index);
     const Row* selectedRow() const;
+    const Row* rowAt(int displayIndex) const;    // row at a display position (post-sort)
+
+    // Sorting. Clicking a sortable header cycles unordered -> ascending ->
+    // descending -> unordered. You can also drive it programmatically.
+    void sortBy(int column, SortDir dir);
+    int     sortColumn() const { return sortCol_; }
+    SortDir sortDir() const { return dir_; }
 
     // Selection/scroll/keyboard for this frame. Returns true if the selection
     // changed. rowActivated() is true on a double-click or Enter.
@@ -74,18 +89,24 @@ private:
     void  scrollToSelected(Font& font);
     float maxScroll(Font& font) const;
     float columnX(int i) const;             // left x of column i
+    int   columnAtX(float mx) const;        // column under x, or -1
+    void  rebuildOrder();                   // rebuild display order from current sort
+    std::string cellStr(int row, int col) const;
 
     std::vector<Column> columns_;
-    std::vector<Row>    rows_;
+    std::vector<Row>    rows_;               // data in insertion order
+    std::vector<int>    order_;              // display order: indices into rows_
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
     Style style_;
-    int   selected_ = -1;
+    int   selected_ = -1;                    // display index into order_
     int   hover_ = -1;
     float scroll_ = 0;
     bool  focused_ = false;
     bool  showHeader_ = true;
     bool  activated_ = false;
     int   rowPad_ = 6;
+    int   sortCol_ = -1;                     // sorted column, or -1 (unordered)
+    SortDir dir_ = SortDir::None;
     Scrollbar bar_;
 };
 

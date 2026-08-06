@@ -2,9 +2,12 @@
 #include "sdlw/window.h"
 #include "sdlw/font.h"
 
+#include "text_util.h" // detail::toLower for case-insensitive alpha sort
+
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <utility>
 
 namespace sdlw {
@@ -14,21 +17,70 @@ ListView::ListView(float x, float y, float w, float h) : x_(x), y_(y), w_(w), h_
 void ListView::setRect(float x, float y, float w, float h) { x_ = x; y_ = y; w_ = w; h_ = h; }
 void ListView::setColumns(std::vector<Column> cols) { columns_ = std::move(cols); }
 void ListView::addColumn(std::string title, float width, Align align) {
-    columns_.push_back({ std::move(title), width, align });
+    columns_.push_back({ std::move(title), width, align, SortType::Alpha, true });
 }
 void ListView::setRows(std::vector<Row> rows) {
     rows_ = std::move(rows);
-    if (selected_ >= rowCount()) selected_ = rowCount() - 1;
+    selected_ = -1;
     scroll_ = 0;
+    rebuildOrder();
 }
-void ListView::addRow(Row cells) { rows_.push_back(std::move(cells)); }
-void ListView::clear() { rows_.clear(); selected_ = -1; hover_ = -1; scroll_ = 0; }
+void ListView::addRow(Row cells) { rows_.push_back(std::move(cells)); rebuildOrder(); }
+void ListView::clear() {
+    rows_.clear(); order_.clear();
+    selected_ = -1; hover_ = -1; scroll_ = 0;
+    sortCol_ = -1; dir_ = SortDir::None;
+}
 
 void ListView::setSelected(int index) {
     selected_ = (index >= 0 && index < rowCount()) ? index : -1;
 }
-const ListView::Row* ListView::selectedRow() const {
-    return (selected_ >= 0 && selected_ < rowCount()) ? &rows_[selected_] : nullptr;
+const ListView::Row* ListView::selectedRow() const { return rowAt(selected_); }
+const ListView::Row* ListView::rowAt(int i) const {
+    return (i >= 0 && i < int(order_.size())) ? &rows_[order_[i]] : nullptr;
+}
+
+std::string ListView::cellStr(int row, int col) const {
+    if (row < 0 || row >= int(rows_.size())) return {};
+    return (col >= 0 && col < int(rows_[row].size())) ? rows_[row][col] : std::string();
+}
+
+void ListView::rebuildOrder() {
+    int n = int(rows_.size());
+    // Remember which underlying row is selected so it stays selected after sort.
+    int selUnderlying = (selected_ >= 0 && selected_ < int(order_.size())) ? order_[selected_] : -1;
+
+    order_.resize(n);
+    for (int i = 0; i < n; ++i) order_[i] = i;
+
+    if (sortCol_ >= 0 && sortCol_ < int(columns_.size()) && dir_ != SortDir::None) {
+        SortType st = columns_[sortCol_].sort;
+        bool desc = (dir_ == SortDir::Descending);
+        std::stable_sort(order_.begin(), order_.end(), [&](int a, int b) {
+            int cmp;
+            if (st == SortType::Numeric) {
+                double da = std::strtod(cellStr(a, sortCol_).c_str(), nullptr);
+                double db = std::strtod(cellStr(b, sortCol_).c_str(), nullptr);
+                cmp = (da < db) ? -1 : (da > db ? 1 : 0);
+            } else {
+                cmp = detail::toLower(cellStr(a, sortCol_))
+                          .compare(detail::toLower(cellStr(b, sortCol_)));
+            }
+            return desc ? cmp > 0 : cmp < 0;
+        });
+    }
+
+    // Restore selection to the same underlying item's new display position.
+    selected_ = -1;
+    if (selUnderlying >= 0)
+        for (int i = 0; i < n; ++i)
+            if (order_[i] == selUnderlying) { selected_ = i; break; }
+}
+
+void ListView::sortBy(int column, SortDir dir) {
+    sortCol_ = (dir == SortDir::None) ? -1 : column;
+    dir_ = dir;
+    rebuildOrder();
 }
 
 int   ListView::rowHeight(Font& font) const { return font.lineHeight() + rowPad_; }
@@ -38,6 +90,15 @@ float ListView::columnX(int i) const {
     float cx = x_;
     for (int c = 0; c < i && c < int(columns_.size()); ++c) cx += columns_[c].width;
     return cx;
+}
+
+int ListView::columnAtX(float mx) const {
+    float cx = x_;
+    for (int c = 0; c < int(columns_.size()); ++c) {
+        if (mx >= cx && mx < cx + columns_[c].width) return c;
+        cx += columns_[c].width;
+    }
+    return -1;
 }
 
 float ListView::maxScroll(Font& font) const {
@@ -89,9 +150,22 @@ bool ListView::update(Window& win, Font& font) {
         if (row >= 0 && row < rowCount()) hover_ = row;
     }
 
+    bool inHeader = showHeader_ && (mx >= x_ && mx < x_ + w_ && my >= y_ && my < y_ + hH);
+
     if (win.mousePressed()) {
         focused_ = inWidget;
-        if (!overBar && inBody && hover_ >= 0) {
+        if (inHeader) {                          // click a header -> cycle its sort
+            int c = columnAtX(mx);
+            if (c >= 0 && columns_[c].sortable) {
+                if (sortCol_ == c) {
+                    if (dir_ == SortDir::Ascending)  dir_ = SortDir::Descending;
+                    else { sortCol_ = -1; dir_ = SortDir::None; }
+                } else {
+                    sortCol_ = c; dir_ = SortDir::Ascending;
+                }
+                rebuildOrder();
+            }
+        } else if (!overBar && inBody && hover_ >= 0) {
             selected_ = hover_;
             if (win.mouseClicks() >= 2) activated_ = true;
         }
@@ -147,6 +221,23 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
         for (int c = 0; c < int(columns_.size()); ++c)
             drawCell(columns_[c].title, columns_[c], columnX(c), y_, hH, style_.headerText);
         SDL_SetRenderClipRect(renderer, nullptr);
+
+        // Sort arrow on the active column (up = ascending, down = descending).
+        if (sortCol_ >= 0 && sortCol_ < int(columns_.size()) && dir_ != SortDir::None) {
+            float ax = columnX(sortCol_) + columns_[sortCol_].width - 12;
+            float ay = y_ + hH * 0.5f;
+            SDL_SetRenderDrawColor(renderer, style_.headerText[0], style_.headerText[1], style_.headerText[2], 255);
+            if (dir_ == SortDir::Ascending) {
+                SDL_RenderLine(renderer, ax - 4, ay + 3, ax + 4, ay + 3);
+                SDL_RenderLine(renderer, ax - 4, ay + 3, ax, ay - 3);
+                SDL_RenderLine(renderer, ax + 4, ay + 3, ax, ay - 3);
+            } else {
+                SDL_RenderLine(renderer, ax - 4, ay - 3, ax + 4, ay - 3);
+                SDL_RenderLine(renderer, ax - 4, ay - 3, ax, ay + 3);
+                SDL_RenderLine(renderer, ax + 4, ay - 3, ax, ay + 3);
+            }
+        }
+
         SDL_SetRenderDrawColor(renderer, style_.border[0], style_.border[1], style_.border[2], 255);
         SDL_RenderLine(renderer, x_, y_ + hH, x_ + w_, y_ + hH);
     }
@@ -171,8 +262,9 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
             SDL_SetRenderDrawColor(renderer, style_.hoverBg[0], style_.hoverBg[1], style_.hoverBg[2], 255);
             SDL_RenderFillRect(renderer, &row);
         }
+        const Row& data = rows_[order_[i]];   // display order (post-sort)
         for (int c = 0; c < int(columns_.size()); ++c) {
-            const std::string& cell = (c < int(rows_[i].size())) ? rows_[i][c] : std::string();
+            const std::string& cell = (c < int(data.size())) ? data[c] : std::string();
             drawCell(cell, columns_[c], columnX(c), rowY, float(rh), txt);
         }
     }
