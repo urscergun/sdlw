@@ -272,20 +272,22 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
         }
         SDL_SetRenderClipRect(renderer, nullptr);
 
-        // Sort arrow on the active column (up = ascending, down = descending).
+        // Sort arrow on the active column: a small filled triangle built from a
+        // single symmetric formula so ascending (up) and descending (down) are
+        // exact mirrors. Snap the center to whole pixels to keep it crisp.
         if (sortCol_ >= 0 && sortCol_ < int(columns_.size()) && dir_ != SortDir::None) {
             float ax = columnX(sortCol_) + columns_[sortCol_].width - 12 - hscroll_;
-            float ay = y_ + hH * 0.5f;
             if (ax > viewLeft && ax < viewRight) {
+                int   cx = int(ax + 0.5f);
+                int   cy = int(y_ + hH * 0.5f + 0.5f);
+                const int hw = 4, hh = 3;      // half-width, half-height
+                bool  up = (dir_ == SortDir::Ascending);
                 SDL_SetRenderDrawColor(renderer, style_.headerText[0], style_.headerText[1], style_.headerText[2], 255);
-                if (dir_ == SortDir::Ascending) {
-                    SDL_RenderLine(renderer, ax - 4, ay + 3, ax + 4, ay + 3);
-                    SDL_RenderLine(renderer, ax - 4, ay + 3, ax, ay - 3);
-                    SDL_RenderLine(renderer, ax + 4, ay + 3, ax, ay - 3);
-                } else {
-                    SDL_RenderLine(renderer, ax - 4, ay - 3, ax + 4, ay - 3);
-                    SDL_RenderLine(renderer, ax - 4, ay - 3, ax, ay + 3);
-                    SDL_RenderLine(renderer, ax + 4, ay - 3, ax, ay + 3);
+                for (int dy = -hh; dy <= hh; ++dy) {
+                    float f = up ? float(dy + hh) / float(2 * hh)   // 0 at top -> full at bottom (apex up)
+                                 : float(hh - dy) / float(2 * hh);  // full at top -> 0 at bottom (apex down)
+                    float halfW = hw * f;
+                    SDL_RenderLine(renderer, cx - halfW, float(cy + dy), cx + halfW, float(cy + dy));
                 }
             }
         }
