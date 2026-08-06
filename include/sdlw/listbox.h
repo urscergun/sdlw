@@ -7,6 +7,7 @@
 #pragma once
 
 #include "sdlw/focus.h"
+#include "sdlw/scrollbar.h"
 
 #include <string>
 #include <vector>
@@ -67,12 +68,7 @@ public:
 private:
     float maxScroll(Font& font) const;      // clamp bound for scroll_
     void  scrollToSelected(Font& font);     // keep selected row visible
-
-    // Scrollbar geometry. Returns false if no scrollbar is needed. When true,
-    // fills the track column x/width and the thumb's y/height (in pixels).
-    bool  scrollbarMetrics(Font& font, float& trackX, float& trackW,
-                           float& trackTop, float& trackH,
-                           float& thumbY, float& thumbH) const;
+    void  syncBar(Font& font);              // feed the scrollbar geometry/range
 
     std::vector<std::string> items_;
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
@@ -82,9 +78,8 @@ private:
     float scroll_ = 0;         // vertical scroll offset in pixels
     bool  focused_ = false;
     int   rowPad_ = 6;         // extra vertical padding per row
-    bool  draggingBar_ = false;// dragging the scrollbar thumb
-    float grabOffset_ = 0;     // mouse-to-thumb-top offset while dragging
     bool  itemClicked_ = false;// an item was clicked this frame
+    Scrollbar bar_;            // vertical scrollbar (right edge)
 };
 
 } // namespace sdlw

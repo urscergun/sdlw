@@ -12,6 +12,9 @@
 #include "sdlw/radiogroup.h"
 #include "sdlw/select.h"
 #include "sdlw/focus.h"
+#include "sdlw/scrollbar.h"
+#include "sdlw/scrollview.h"
+#include "sdlw/listbox.h"
 
 #include <string>
 
@@ -288,6 +291,80 @@ TEST(focus_click_sync_and_defocus) {
     focus.update(win);
     CHECK(focus.focused() == nullptr);
     CHECK(!b.focused());
+}
+
+TEST(scrollbar_drag_page_and_clamp) {
+    Window win{Window::Headless{}};
+    Scrollbar bar;
+    // Track at x 0..8, y 0..200; content 500, view 200 -> maxScroll 300.
+    bar.setRect(0, 0, 8, 200);
+    bar.setRange(500, 200);
+    CHECK(bar.needed());
+    CHECK_EQ(int(bar.maxScroll()), 300);
+
+    // Grab the thumb (top, value 0) and drag to the bottom -> value == maxScroll.
+    // thumbH = max(20, 200*200/500)=80; thumb top at 0.
+    win.clearFrameInput(); win.feedMouse(4, 10, true); win.feedMousePress(1);
+    bar.update(win);                       // start drag (grab offset 10)
+    win.clearFrameInput(); win.feedMouse(4, 400, true); // drag way past bottom
+    bar.update(win);
+    CHECK(bar.value() >= bar.maxScroll() - 0.5f);
+
+    // Release; page up by clicking the track above the thumb.
+    win.clearFrameInput(); win.feedMouse(4, 400, false); bar.update(win);
+    float before = bar.value();      // == maxScroll (300)
+    win.clearFrameInput(); win.feedMouse(4, 5, true); win.feedMousePress(1);
+    bar.update(win);
+    CHECK(bar.value() < before);     // paged up (toward 0) by one view height
+
+    // No scrollbar when content fits.
+    Scrollbar small;
+    small.setRect(0, 0, 8, 200);
+    small.setRange(100, 200);
+    CHECK(!small.needed());
+    CHECK_EQ(int(small.maxScroll()), 0);
+}
+
+TEST(scrollview_wheel_and_content_origin) {
+    Window win{Window::Headless{}};
+    ScrollView view(0, 0, 200, 100);   // viewport 100 tall (inner 98)
+    view.setContentHeight(500);        // maxScroll = 500 - 98 = 402
+
+    // Wheel down (negative y) scrolls content up (scroll increases).
+    win.clearFrameInput(); win.feedMouse(50, 50, false); win.feedWheel(-1);
+    CHECK(view.update(win));
+    float s = view.scroll();
+    CHECK(s > 0);
+    // contentTop() = y + pad - scroll  (content origin shifts up as we scroll).
+    CHECK_EQ(int(view.contentTop()), int(0 + 6 - s));
+
+    // Wheel outside the view does nothing.
+    float before = view.scroll();
+    win.clearFrameInput(); win.feedMouse(500, 500, false); win.feedWheel(-3);
+    view.update(win);
+    CHECK_EQ(view.scroll(), before);
+}
+
+TEST(listbox_scrolls_with_wheel_and_bar) {
+    Window win{Window::Headless{}};
+    Font font; loadMono(font);         // lineHeight 20 -> rowHeight 26
+    ListBox list(0, 0, 120, 100);      // view 98; 20 items -> content 520
+    std::vector<std::string> items;
+    for (int i = 0; i < 20; ++i) items.push_back("item" + std::to_string(i));
+    list.setItems(items);
+
+    // Focus via click on first row, then wheel down should scroll.
+    win.clearFrameInput(); win.feedMouse(10, 10, true); win.feedMousePress(1);
+    list.update(win, font);
+    win.clearFrameInput(); win.feedMouse(10, 10, false); win.feedWheel(-2);
+    list.update(win, font);
+    // Scrolled down: the first visible row is no longer row 0. We can't read
+    // scroll_ directly, but End key should reveal the last item and selection
+    // via keyboard still works.
+    win.clearFrameInput(); win.feedKey(Key::End);
+    list.update(win, font);
+    CHECK_EQ(list.selected(), 19);
+    CHECK_STR_EQ(*list.selectedItem(), "item19");
 }
 
 SDLW_TEST_MAIN()
