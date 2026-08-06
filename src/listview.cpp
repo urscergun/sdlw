@@ -157,6 +157,9 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
     int first = std::max(0, int(scroll_ / rh));
     int last  = std::min(rowCount() - 1, int((scroll_ + bodyH) / rh));
     for (int i = first; i <= last; ++i) {
+        // Reset to the body clip: drawCell narrows the clip per cell, so the
+        // next row's highlight fill must restore the full-width viewport first.
+        SDL_SetRenderClipRect(renderer, &bodyClip);
         float rowY = bodyTop + i * rh - scroll_;
         SDL_FRect row{ x_ + 1, rowY, w_ - 2, float(rh) };
         const unsigned char* txt = style_.item;
