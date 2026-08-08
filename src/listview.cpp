@@ -243,13 +243,16 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
     SDL_RenderFillRect(renderer, &rect);
 
     // Draws a cell; colX is already shifted by -hscroll_. Clips to the column
-    // intersected with the content viewport so nothing spills under the bars.
+    // intersected with the content viewport horizontally, and with the caller's
+    // region [clipTop, clipBot] vertically (the header band or the body band),
+    // so a partially-scrolled body row never paints over the header.
     auto drawCell = [&](const std::string& text, const Column& col, float colX,
-                        float rowY, float rowH, const unsigned char* color) {
+                        float rowY, float rowH, float clipTop, float clipBot,
+                        const unsigned char* color) {
         float cl = std::max(colX, viewLeft);
         float cr = std::min(colX + col.width, viewRight);
-        float ct = std::max(rowY, y_);
-        float cb = std::min(rowY + rowH, y_ + h_);
+        float ct = std::max(rowY, clipTop);
+        float cb = std::min(rowY + rowH, clipBot);
         if (cr <= cl || cb <= ct) return;
         SDL_Rect clip{ int(cl), int(ct), int(cr - cl), int(cb - ct) };
         SDL_SetRenderClipRect(renderer, &clip);
@@ -268,7 +271,7 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
         for (int c = 0; c < int(columns_.size()); ++c) {
             Column hc = columns_[c];
             if (hc.sortable) hc.width = std::max(0.0f, hc.width - kSortIconW);
-            drawCell(columns_[c].title, hc, columnX(c) - hscroll_, y_, hH, style_.headerText);
+            drawCell(columns_[c].title, hc, columnX(c) - hscroll_, y_, hH, y_, y_ + hH, style_.headerText);
         }
         SDL_SetRenderClipRect(renderer, nullptr);
 
@@ -317,7 +320,8 @@ void ListView::draw(SDL_Renderer* renderer, Font& font) {
         const Row& data = rows_[order_[i]];   // display order (post-sort)
         for (int c = 0; c < int(columns_.size()); ++c) {
             const std::string& cell = (c < int(data.size())) ? data[c] : std::string();
-            drawCell(cell, columns_[c], columnX(c) - hscroll_, rowY, float(rh), txt);
+            drawCell(cell, columns_[c], columnX(c) - hscroll_, rowY, float(rh),
+                     bodyTop, bodyTop + bodyH_, txt);
         }
     }
     SDL_SetRenderClipRect(renderer, nullptr);
