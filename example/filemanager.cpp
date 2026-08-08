@@ -158,10 +158,16 @@ int Main(int argc, char** argv) {
                 else { status.setText("Deleted " + e->name); refresh(*active); }
             }
         }
-        if (doUp) {   // Backspace: go up one directory in the active pane.
-            fs::path p = fs::path(active->path());
+        if (doUp) {   // Backspace: go up one dir in the pane under the mouse
+            auto under = [&](FileList& f) {
+                float x, y, w, h; f.focusRect(x, y, w, h);
+                return win.mouseX() >= x && win.mouseX() < x + w &&
+                       win.mouseY() >= y && win.mouseY() < y + h;
+            };
+            FileList* target = under(left) ? &left : (under(right) ? &right : active);
+            fs::path p = fs::path(target->path());
             fs::path parent = p.parent_path();
-            if (!parent.empty() && parent != p) active->setPath(parent.string());
+            if (!parent.empty() && parent != p) target->setPath(parent.string());
         }
 
         leftPath.setText(left.path());
