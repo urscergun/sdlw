@@ -65,7 +65,7 @@ int Main(int argc, char** argv) {
     Button copyBtn("Copy (F5)", 0, 0, 0, 0);
     Button moveBtn("Move (F6)", 0, 0, 0, 0);
     Button delBtn("Delete (F8)", 0, 0, 0, 0);
-    Label status("Point at a pane (it highlights), pick an item. Copy F5, Move F6, Delete F8/Del, Up Backspace.", 0, 0);
+    Label status("Click a pane to focus it (path highlights), pick an item. Copy F5, Move F6, Delete F8/Del, Up Backspace.", 0, 0);
     status.style().color[0] = 180; status.style().color[1] = 190; status.style().color[2] = 200;
 
     // Layout tree.
@@ -108,18 +108,10 @@ int Main(int argc, char** argv) {
         left.update(win, ui);
         right.update(win, ui);
 
-        // The "active" (source) pane is the one under the mouse; if the cursor
-        // isn't over a pane (e.g. it's on a button), fall back to the focused
-        // pane, else keep the last one. All operations use this single pane, so
-        // Copy/Move/Delete/Backspace are always consistent.
-        auto under = [&](FileList& f) {
-            float x, y, w, h; f.focusRect(x, y, w, h);
-            return win.mouseX() >= x && win.mouseX() < x + w &&
-                   win.mouseY() >= y && win.mouseY() < y + h;
-        };
-        if (under(left))       active = &left;
-        else if (under(right)) active = &right;
-        else if (focus.focused() == &left)  active = &left;
+        // The "active" (source) pane is the focused one (click a pane or Tab to
+        // it; its path highlights). It stays active until the other pane gains
+        // focus. All operations — Copy/Move/Delete/Backspace — act on it.
+        if (focus.focused() == &left)  active = &left;
         else if (focus.focused() == &right) active = &right;
         FileList* other = (active == &left) ? &right : &left;
 
