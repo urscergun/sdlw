@@ -49,6 +49,9 @@ struct Window::Impl {
     bool          mouseDown = false;
     bool          modShift = false, modCtrl = false;
     std::string   clipboard;                        // in-memory clipboard (headless)
+
+    std::function<void()> frameCb;                  // render-one-frame callback
+    bool          watchAdded = false;               // event watch installed
 };
 
 namespace {
@@ -124,10 +127,32 @@ Window::Window(const WindowConfig& config) : impl_(new Impl) {
 Window::Window(Headless) : impl_(new Impl) {}
 
 Window::~Window() {
+    if (impl_->watchAdded) SDL_RemoveEventWatch(&Window::frameWatch, impl_);
     if (impl_->renderer) SDL_DestroyRenderer(impl_->renderer);
     if (impl_->window)   SDL_DestroyWindow(impl_->window);
     if (impl_->sdlOwned) releaseSdlInit();
     delete impl_;
+}
+
+// Called by SDL for every event, including during the OS modal resize loop,
+// which is where the main thread would otherwise be blocked. Redrawing on
+// EXPOSED/RESIZED keeps the window live while it is being resized.
+bool Window::frameWatch(void* userdata, SDL_Event* e) {
+    Impl* impl = static_cast<Impl*>(userdata);
+    if (impl && impl->frameCb &&
+        (e->type == SDL_EVENT_WINDOW_EXPOSED || e->type == SDL_EVENT_WINDOW_RESIZED)) {
+        if (!impl->window || e->window.windowID == SDL_GetWindowID(impl->window))
+            impl->frameCb();
+    }
+    return true;   // keep the event in the queue
+}
+
+void Window::setFrameCallback(std::function<void()> render) {
+    impl_->frameCb = std::move(render);
+    if (impl_->window && !impl_->watchAdded) {
+        SDL_AddEventWatch(&Window::frameWatch, impl_);
+        impl_->watchAdded = true;
+    }
 }
 
 bool Window::ok() const {

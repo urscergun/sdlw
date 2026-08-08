@@ -144,22 +144,11 @@ int Main(int argc, char** argv) {
     focus.add(&items); focus.add(&view); focus.add(&table);
     focus.add(&submit); focus.add(&reset);
 
-    float t = 0;
-    while (win.pumpEvents()) {
-        // Arrange the whole tree into the current window size (handles resizing).
+    // Render one frame: arrange the tree to the window size, then draw. Used
+    // each loop iteration AND during live resize (registered below), so the UI
+    // reflows and repaints while the window border is being dragged.
+    auto render = [&]() {
         root.arrange({ 0, 0, float(win.width()), float(win.height()) });
-
-        focus.update(win);
-        name.update(win, ui);   country.update(win, ui); lang.update(win, ui);
-        subscribe.update(win);  plan.update(win);
-        items.update(win, ui);  table.update(win, ui);   view.update(win);
-        if (submit.update(win)) status.setText("Submitted: " + (name.text().empty() ? std::string("(no name)") : name.text()));
-        if (reset.update(win)) {
-            name.setText(""); country.setText(""); lang.setSelected(-1);
-            subscribe.setChecked(false); plan.setSelected(0); status.setText("");
-        }
-        t += 0.004f; if (t > 1.0f) t = 0.0f;
-        bar.setValue(t);
 
         win.clear(24, 24, 32);
         title.style().color[0] = 120; title.style().color[1] = 200; title.style().color[2] = 255;
@@ -191,6 +180,25 @@ int Main(int argc, char** argv) {
 
         focus.drawFocusRing(win.renderer());
         win.present();
+    };
+    win.setFrameCallback(render);   // keep redrawing during live resize
+
+    float t = 0;
+    while (win.pumpEvents()) {
+        root.arrange({ 0, 0, float(win.width()), float(win.height()) });
+        focus.update(win);
+        name.update(win, ui);   country.update(win, ui); lang.update(win, ui);
+        subscribe.update(win);  plan.update(win);
+        items.update(win, ui);  table.update(win, ui);   view.update(win);
+        if (submit.update(win)) status.setText("Submitted: " + (name.text().empty() ? std::string("(no name)") : name.text()));
+        if (reset.update(win)) {
+            name.setText(""); country.setText(""); lang.setSelected(-1);
+            subscribe.setChecked(false); plan.setSelected(0); status.setText("");
+        }
+        t += 0.004f; if (t > 1.0f) t = 0.0f;
+        bar.setValue(t);
+
+        render();
     }
     return 0;
 }

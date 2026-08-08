@@ -101,6 +101,33 @@ int Main(int argc, char** argv) {
 
     auto refresh = [](FileList& f) { f.setPath(f.path()); };
 
+    // Render one frame (arrange + draw). Also invoked during live resize.
+    auto render = [&]() {
+        root.arrange({ 0, 0, float(win.width()), float(win.height()) });
+        leftPath.setText(left.path());
+        rightPath.setText(right.path());
+        auto tint = [&](Label& l, bool on) {
+            l.style().color[0] = on ? 120 : 190; l.style().color[1] = on ? 200 : 190; l.style().color[2] = on ? 255 : 200;
+        };
+        tint(leftPath, active == &left);
+        tint(rightPath, active == &right);
+
+        win.clear(24, 24, 32);
+        title.style().color[0] = 120; title.style().color[1] = 200; title.style().color[2] = 255;
+        title.draw(win.renderer(), heading);
+        leftPath.draw(win.renderer(), ui);
+        rightPath.draw(win.renderer(), ui);
+        left.draw(win.renderer(), ui);
+        right.draw(win.renderer(), ui);
+        copyBtn.draw(win.renderer(), ui);
+        moveBtn.draw(win.renderer(), ui);
+        delBtn.draw(win.renderer(), ui);
+        status.draw(win.renderer(), ui);
+        focus.drawFocusRing(win.renderer());
+        win.present();
+    };
+    win.setFrameCallback(render);   // keep redrawing during live resize
+
     while (win.pumpEvents()) {
         root.arrange({ 0, 0, float(win.width()), float(win.height()) });
 
@@ -166,28 +193,7 @@ int Main(int argc, char** argv) {
             if (!parent.empty() && parent != p) active->setPath(parent.string());
         }
 
-        leftPath.setText(left.path());
-        rightPath.setText(right.path());
-        // Highlight the active pane's path label.
-        auto tint = [&](Label& l, bool on) {
-            l.style().color[0] = on ? 120 : 190; l.style().color[1] = on ? 200 : 190; l.style().color[2] = on ? 255 : 200;
-        };
-        tint(leftPath, active == &left);
-        tint(rightPath, active == &right);
-
-        win.clear(24, 24, 32);
-        title.style().color[0] = 120; title.style().color[1] = 200; title.style().color[2] = 255;
-        title.draw(win.renderer(), heading);
-        leftPath.draw(win.renderer(), ui);
-        rightPath.draw(win.renderer(), ui);
-        left.draw(win.renderer(), ui);
-        right.draw(win.renderer(), ui);
-        copyBtn.draw(win.renderer(), ui);
-        moveBtn.draw(win.renderer(), ui);
-        delBtn.draw(win.renderer(), ui);
-        status.draw(win.renderer(), ui);
-        focus.drawFocusRing(win.renderer());
-        win.present();
+        render();
     }
     return 0;
 }

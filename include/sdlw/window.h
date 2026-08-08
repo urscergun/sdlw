@@ -8,11 +8,13 @@
 // Everything else here is plain in-house C++; libSDL is the only dependency.
 #pragma once
 
+#include <functional>
 #include <string>
 
 // Opaque SDL forward declarations so users don't need SDL headers to use the API.
 struct SDL_Window;
 struct SDL_Renderer;
+union  SDL_Event;
 
 namespace sdlw {
 
@@ -65,6 +67,12 @@ public:
 
     // Swap the back buffer to the screen.
     void present();
+
+    // Register a function that renders one frame (arrange + draw + present).
+    // Besides calling it yourself each loop iteration, sdlw invokes it during a
+    // live window resize (via an SDL event watch), so the UI keeps redrawing
+    // while the user drags the border instead of freezing until the drag ends.
+    void setFrameCallback(std::function<void()> render);
 
     int width() const;
     int height() const;
@@ -128,6 +136,8 @@ public:
     const char* error() const;
 
 private:
+    static bool frameWatch(void* userdata, SDL_Event* event);  // SDL event-watch hook
+
     struct Impl;
     Impl* impl_;
 };

@@ -22,6 +22,9 @@ void          SDL_DestroyRenderer(SDL_Renderer*) {}
 bool          SDL_SetRenderVSync(SDL_Renderer*, int) { return true; }
 
 bool          SDL_PollEvent(SDL_Event*) { return false; }
+bool          SDL_AddEventWatch(SDL_EventFilter, void*) { return true; }
+void          SDL_RemoveEventWatch(SDL_EventFilter, void*) {}
+SDL_WindowID  SDL_GetWindowID(SDL_Window*) { return 0; }
 SDL_MouseButtonFlags SDL_GetMouseState(float* x, float* y) { if (x) *x = 0; if (y) *y = 0; return 0; }
 SDL_Keymod    SDL_GetModState(void) { return 0; }
 Uint64        SDL_GetTicks(void) { return 0; }
