@@ -62,10 +62,10 @@ int Main(int argc, char** argv) {
     left.setPath(start);
     right.setPath(start);
 
-    Button copyBtn("Copy > other", 0, 0, 0, 0);   // ASCII-only font atlas
-    Button moveBtn("Move > other", 0, 0, 0, 0);
-    Button delBtn("Delete", 0, 0, 0, 0);
-    Label status("Focus a pane, pick an item, then Copy / Move / Delete.", 0, 0);
+    Button copyBtn("Copy (F5)", 0, 0, 0, 0);
+    Button moveBtn("Move (F6)", 0, 0, 0, 0);
+    Button delBtn("Delete (F8)", 0, 0, 0, 0);
+    Label status("Focus a pane, pick an item. Copy F5, Move F6, Delete F8/Del, Up Backspace.", 0, 0);
     status.style().color[0] = 180; status.style().color[1] = 190; status.style().color[2] = 200;
 
     // Layout tree.
@@ -94,7 +94,8 @@ int Main(int argc, char** argv) {
 
     FocusManager focus;
     focus.add(&left); focus.add(&right);
-    focus.add(&copyBtn); focus.add(&moveBtn); focus.add(&delBtn);
+    //focus.add(&copyBtn); focus.add(&moveBtn); focus.add(&delBtn);
+    focus.setFocus(&left, win);
 
     FileList* active = &left;   // source pane (last-focused of the two)
 
@@ -112,7 +113,16 @@ int Main(int argc, char** argv) {
         else if (focus.focused() == &right) active = &right;
         FileList* other = (active == &left) ? &right : &left;
 
-        if (copyBtn.update(win)) {
+        // Update the buttons (so they track hover/press), then add key triggers.
+        bool doCopy   = copyBtn.update(win);
+        bool doMove   = moveBtn.update(win);
+        bool doDelete = delBtn.update(win);
+        if (win.keyPressed(Key::F5)) doCopy = true;
+        if (win.keyPressed(Key::F6)) doMove = true;
+        if (win.keyPressed(Key::F8) || win.keyPressed(Key::Delete)) doDelete = true;
+        bool doUp = win.keyPressed(Key::Backspace);
+
+        if (doCopy) {
             const FileList::Entry* e = active->selectedEntry();
             if (!e || e->name == "..") status.setText("Select a file or folder first.");
             else {
@@ -122,7 +132,7 @@ int Main(int argc, char** argv) {
                 else { status.setText("Copied " + e->name); refresh(*other); }
             }
         }
-        if (moveBtn.update(win)) {
+        if (doMove) {
             const FileList::Entry* e = active->selectedEntry();
             if (!e || e->name == "..") status.setText("Select a file or folder first.");
             else {
@@ -138,7 +148,7 @@ int Main(int argc, char** argv) {
                 else { status.setText("Moved " + e->name); refresh(*active); refresh(*other); }
             }
         }
-        if (delBtn.update(win)) {
+        if (doDelete) {
             const FileList::Entry* e = active->selectedEntry();
             if (!e || e->name == "..") status.setText("Select a file or folder first.");
             else {
@@ -147,6 +157,11 @@ int Main(int argc, char** argv) {
                 if (e1) status.setText("Delete failed: " + e1.message());
                 else { status.setText("Deleted " + e->name); refresh(*active); }
             }
+        }
+        if (doUp) {   // Backspace: go up one directory in the active pane.
+            fs::path p = fs::path(active->path());
+            fs::path parent = p.parent_path();
+            if (!parent.empty() && parent != p) active->setPath(parent.string());
         }
 
         leftPath.setText(left.path());

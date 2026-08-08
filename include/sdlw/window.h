@@ -21,6 +21,7 @@ namespace sdlw {
 enum class Key {
     Backspace, Delete, Left, Right, Up, Down, Home, End, PageUp, PageDown, Enter, Tab, Space,
     SelectAll, Copy, Cut, Paste,
+    F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12,
     Count
 };
 

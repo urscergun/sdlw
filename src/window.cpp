@@ -78,6 +78,12 @@ int keyIndex(SDL_Keycode k, SDL_Keymod mod) {
         case SDLK_RETURN:    return int(Key::Enter);
         case SDLK_TAB:       return int(Key::Tab);
         case SDLK_SPACE:     return int(Key::Space);
+        case SDLK_F1:  return int(Key::F1);   case SDLK_F2:  return int(Key::F2);
+        case SDLK_F3:  return int(Key::F3);   case SDLK_F4:  return int(Key::F4);
+        case SDLK_F5:  return int(Key::F5);   case SDLK_F6:  return int(Key::F6);
+        case SDLK_F7:  return int(Key::F7);   case SDLK_F8:  return int(Key::F8);
+        case SDLK_F9:  return int(Key::F9);   case SDLK_F10: return int(Key::F10);
+        case SDLK_F11: return int(Key::F11);  case SDLK_F12: return int(Key::F12);
         default:             return -1;
     }
 }
