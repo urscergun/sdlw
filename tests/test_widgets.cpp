@@ -16,7 +16,10 @@
 #include "sdlw/scrollview.h"
 #include "sdlw/listbox.h"
 #include "sdlw/listview.h"
+#include "sdlw/filelist.h"
 
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 using namespace sdlw;
@@ -527,6 +530,51 @@ TEST(listview_horizontal_scroll) {
     win.clearFrameInput(); win.feedMouse(50, 60, true); win.feedMousePress(1);
     lv.update(win, font);
     CHECK(lv.selected() >= 0);         // a row got selected despite horizontal scroll
+}
+
+TEST(filelist_lists_folders_first_and_navigates) {
+    namespace fs = std::filesystem;
+    // Build a temp directory: sub/ (folder), a.txt, b.cpp.
+    fs::path base = fs::temp_directory_path() / ("sdlw_fl_" + std::to_string(::time(nullptr)));
+    fs::create_directories(base / "sub");
+    { std::ofstream(base / "a.txt") << "hello"; }
+    { std::ofstream(base / "b.cpp") << "int main(){}"; }
+
+    Window win{Window::Headless{}};
+    Font font; loadMono(font);          // headerH 26, rowHeight 26
+    FileList fl(0, 0, 300, 300);
+    CHECK(fl.setPath(base.string()));
+
+    // Order: ".." , sub (folder), then files a.txt, b.cpp.
+    CHECK_EQ(fl.list().rowCount(), 4);
+    CHECK_STR_EQ((*fl.list().rowAt(0))[0], "..");
+    CHECK_STR_EQ((*fl.list().rowAt(1))[0], "sub");
+    CHECK_STR_EQ((*fl.list().rowAt(1))[2], "Folder");   // Type column
+    CHECK_STR_EQ((*fl.list().rowAt(2))[0], "a.txt");
+    CHECK_STR_EQ((*fl.list().rowAt(2))[2], "txt");
+    CHECK_STR_EQ((*fl.list().rowAt(3))[1], "12 B");      // b.cpp size (12 bytes)
+
+    // Double-click "sub" (display row 1): body top 27, row1 spans y 53.. -> y=60.
+    win.clearFrameInput(); win.feedMouse(30, 60, true); win.feedMousePress(2);
+    bool fileActivated = fl.update(win, font);
+    CHECK(!fileActivated);                              // folder -> navigated, not a file
+    CHECK(fs::path(fl.path()).filename() == "sub");     // now inside sub/
+    CHECK_STR_EQ((*fl.list().rowAt(0))[0], "..");       // sub has a ".." to go back
+
+    // Activate ".." (row 0): y=35 -> back to base.
+    win.clearFrameInput(); win.feedMouse(30, 35, true); win.feedMousePress(2);
+    fl.update(win, font);
+    CHECK_EQ(fs::path(fl.path()), fs::weakly_canonical(base));
+
+    // Activate a file -> update returns true.
+    fl.list().setSelected(2);                           // a.txt
+    win.clearFrameInput(); win.feedKey(Key::Enter);
+    // (Enter activation needs focus; the list is focused after the earlier click.)
+    bool activated = fl.update(win, font);
+    CHECK(activated);
+    CHECK(fl.selectedEntry() && !fl.selectedEntry()->isDir);
+
+    std::error_code ec; fs::remove_all(base, ec);
 }
 
 SDLW_TEST_MAIN()

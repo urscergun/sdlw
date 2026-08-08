@@ -69,6 +69,7 @@ add_library(sdlw STATIC
     src/scrollview.cpp
     src/listview.cpp
     src/layout.cpp
+    src/filelist.cpp
 )
 target_include_directories(sdlw PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -124,7 +125,7 @@ if(SDLW_BUILD_TESTS)
         src/window.cpp src/font.cpp
         src/button.cpp src/textbox.cpp src/listbox.cpp src/combobox.cpp
         src/checkbox.cpp src/radiogroup.cpp src/select.cpp src/focus.cpp
-        src/scrollbar.cpp src/scrollview.cpp src/listview.cpp)
+        src/scrollbar.cpp src/scrollview.cpp src/listview.cpp src/filelist.cpp)
     target_include_directories(test_widgets PRIVATE
         include src tests ${CMAKE_CURRENT_SOURCE_DIR}/vendor/SDL/include)
     add_test(NAME test_widgets COMMAND test_widgets)
