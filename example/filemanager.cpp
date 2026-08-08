@@ -65,7 +65,7 @@ int Main(int argc, char** argv) {
     Button copyBtn("Copy (F5)", 0, 0, 0, 0);
     Button moveBtn("Move (F6)", 0, 0, 0, 0);
     Button delBtn("Delete (F8)", 0, 0, 0, 0);
-    Label status("Focus a pane, pick an item. Copy F5, Move F6, Delete F8/Del, Up Backspace.", 0, 0);
+    Label status("Point at a pane (it highlights), pick an item. Copy F5, Move F6, Delete F8/Del, Up Backspace.", 0, 0);
     status.style().color[0] = 180; status.style().color[1] = 190; status.style().color[2] = 200;
 
     // Layout tree.
@@ -108,8 +108,18 @@ int Main(int argc, char** argv) {
         left.update(win, ui);
         right.update(win, ui);
 
-        // The "active" pane is whichever of the two was focused most recently.
-        if (focus.focused() == &left)  active = &left;
+        // The "active" (source) pane is the one under the mouse; if the cursor
+        // isn't over a pane (e.g. it's on a button), fall back to the focused
+        // pane, else keep the last one. All operations use this single pane, so
+        // Copy/Move/Delete/Backspace are always consistent.
+        auto under = [&](FileList& f) {
+            float x, y, w, h; f.focusRect(x, y, w, h);
+            return win.mouseX() >= x && win.mouseX() < x + w &&
+                   win.mouseY() >= y && win.mouseY() < y + h;
+        };
+        if (under(left))       active = &left;
+        else if (under(right)) active = &right;
+        else if (focus.focused() == &left)  active = &left;
         else if (focus.focused() == &right) active = &right;
         FileList* other = (active == &left) ? &right : &left;
 
@@ -158,16 +168,10 @@ int Main(int argc, char** argv) {
                 else { status.setText("Deleted " + e->name); refresh(*active); }
             }
         }
-        if (doUp) {   // Backspace: go up one dir in the pane under the mouse
-            auto under = [&](FileList& f) {
-                float x, y, w, h; f.focusRect(x, y, w, h);
-                return win.mouseX() >= x && win.mouseX() < x + w &&
-                       win.mouseY() >= y && win.mouseY() < y + h;
-            };
-            FileList* target = under(left) ? &left : (under(right) ? &right : active);
-            fs::path p = fs::path(target->path());
+        if (doUp) {   // Backspace: go up one directory in the active pane.
+            fs::path p = fs::path(active->path());
             fs::path parent = p.parent_path();
-            if (!parent.empty() && parent != p) target->setPath(parent.string());
+            if (!parent.empty() && parent != p) active->setPath(parent.string());
         }
 
         leftPath.setText(left.path());
