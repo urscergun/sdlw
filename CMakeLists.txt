@@ -16,6 +16,15 @@ else()
 endif()
 option(SDLW_INSTALL "Generate install/package rules for sdlw" ${_sdlw_top_level})
 
+# Statically link the MSVC C runtime (/MT) so deployed Windows exes don't need
+# the Visual C++ redistributable (vcruntime140.dll / msvcp140.dll). Must be set
+# before any targets are created so the vendored SDL3 inherits it. Relies on
+# CMP0091 (NEW by default for cmake_minimum_required >= 3.15).
+option(SDLW_STATIC_RUNTIME "Statically link the MSVC C runtime (Windows)" OFF)
+if(SDLW_STATIC_RUNTIME AND MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 # libSDL is the only external dependency. By default we build the vendored
 # copy in vendor/SDL (a git submodule) so the project has zero system deps.
 # Set SDLW_USE_SYSTEM_SDL=ON to link a system-installed SDL3 instead.
