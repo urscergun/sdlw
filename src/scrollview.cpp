@@ -14,6 +14,15 @@ ScrollView::ScrollView(float x, float y, float w, float h) { setRect(x, y, w, h)
 
 void ScrollView::setRect(float x, float y, float w, float h) { x_ = x; y_ = y; w_ = w; h_ = h; }
 
+// Size the scrollbar from the current rect + content height. Called from both
+// update() and beginContent() so the bar tracks the panel even during a live
+// resize (when only the draw path runs, not update()).
+void ScrollView::layoutBar() {
+    float innerH = h_ - 2;
+    bar_.setRect(x_ + w_ - kBarW - 1, y_ + 1, kBarW, innerH);
+    bar_.setRange(contentH_, innerH);
+}
+
 float ScrollView::viewHeight() const { return h_ - 2; }
 float ScrollView::viewWidth() const {
     return w_ - 2 * kPad - (bar_.needed() ? kBarW + 2 : 0);
@@ -22,9 +31,8 @@ float ScrollView::contentX() const { return x_ + kPad; }
 float ScrollView::contentTop() const { return y_ + kPad - bar_.value(); }
 
 bool ScrollView::update(Window& win) {
+    layoutBar();
     float innerH = h_ - 2;
-    bar_.setRect(x_ + w_ - kBarW - 1, y_ + 1, kBarW, innerH);
-    bar_.setRange(contentH_, innerH);
 
     float old = bar_.value();
     float mx = win.mouseX(), my = win.mouseY();
@@ -51,6 +59,7 @@ bool ScrollView::update(Window& win) {
 }
 
 void ScrollView::beginContent(SDL_Renderer* renderer) {
+    layoutBar();   // keep the bar sized to the panel even during live resize
     SDL_FRect bg{ x_, y_, w_, h_ };
     SDL_SetRenderDrawColor(renderer, style_.bg[0], style_.bg[1], style_.bg[2], 255);
     SDL_RenderFillRect(renderer, &bg);

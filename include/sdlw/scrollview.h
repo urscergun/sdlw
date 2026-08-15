@@ -58,6 +58,8 @@ public:
     bool focused() const override { return focused_; }
 
 private:
+    void layoutBar();   // size the scrollbar from the current rect
+
     Scrollbar bar_;
     float x_ = 0, y_ = 0, w_ = 0, h_ = 0;
     float contentH_ = 0;
